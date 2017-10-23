@@ -1,0 +1,57 @@
+# makefile taken from Oragono's one made up by https://github.com/enckse - thanks Sean!
+BUILD=./build
+WIN=$(BUILD)/win
+LINUX=$(BUILD)/linux
+OSX=$(BUILD)/osx
+ARM6=$(BUILD)/arm
+SOURCE=irctcat.go
+VERS=XXX
+
+.PHONY: all clean windows osx linux arm6
+
+add-files = mkdir -p $1; \
+	cp oragono.yaml $1; \
+	cp oragono.motd $1; \
+	cp LICENSE $1; \
+	cp ./docs/README $1; \
+	mkdir -p $1/docs; \
+	cp ./CHANGELOG.md $1/docs/; \
+	cp ./docs/*.md $1/docs/; \
+	cp ./docs/logo* $1/docs/;
+
+all: clean windows osx linux arm6
+
+clean:
+	rm -rf $(BUILD)
+	mkdir -p $(BUILD)
+
+windows:
+	GOOS=windows GOARCH=amd64 go build $(SOURCE)
+	$(call add-files,$(WIN))
+	mv irctcat.exe $(WIN)
+	cd $(WIN) && zip -r ../irctcat-$(VERS)-windows.zip *
+
+osx:
+	GOOS=darwin GOARCH=amd64 go build $(SOURCE)
+	$(call add-files,$(OSX))
+	mv irctcat $(OSX)
+	cd $(OSX) && tar -czvf ../irctcat-$(VERS)-osx.tgz *
+
+linux:
+	GOOS=linux GOARCH=amd64 go build $(SOURCE)
+	$(call add-files,$(LINUX))
+	mv irctcat $(LINUX)
+	cd $(LINUX) && tar -czvf ../irctcat-$(VERS)-linux.tgz *
+
+arm6:
+	GOARM=6 GOARCH=arm go build $(SOURCE)
+	$(call add-files,$(ARM6))
+	mv irctcat $(ARM6)
+	cd $(ARM6) && tar -czvf ../irctcat-$(VERS)-arm.tgz *
+
+deps:
+	go get -v -d
+
+test:
+	cd lib && go test .
+	cd lib && go vet .
