@@ -15,24 +15,24 @@ import (
 	"github.com/goshuirc/irc-go/ircmsg"
 
 	docopt "github.com/docopt/docopt-go"
-	"github.com/goshuirc/irctcat/lib"
+	"github.com/goshuirc/ircdog/lib"
 )
 
 func main() {
 	version := lib.SemVer
-	usage := `irctcat.
-irctcat is a very simple telnet-like connection helper for IRC. Essentially,
-you connect to an IRC server and send/see raw IRC protocol lines, which is very
+	usage := `ircdog.
+ircdog is a very simple telnet-like connection helper for IRC. Essentially, you
+connect to an IRC server and send/see raw IRC protocol lines, which is very
 useful for ircd and client developers.
 
-What irctcat lets you do is ignore incoming PINGs (by automatically responding
+What ircdog lets you do is ignore incoming PINGs (by automatically responding
 to them) and see formatting characters (such as bold, colors and italics) on
 incoming lines.
 
 Usage:
-	irctcat <host> <port> [options]
-	irctcat -h | --help
-	irctcat --version
+	ircdog <host> <port> [options]
+	ircdog -h | --help
+	ircdog --version
 
 Options:
 	--tls               Connect using TLS.
@@ -82,7 +82,7 @@ Options:
 			if !arguments["--nopings"].(bool) {
 				msg, err := ircmsg.ParseLine(line)
 				if err != nil {
-					fmt.Println("**irctcat warning: this line looks incorrect**")
+					fmt.Println("** ircdog warning: this line looks incorrect **")
 					continue
 				}
 				if msg.Command == "PING" {
@@ -98,14 +98,14 @@ Options:
 	for {
 		line, err := reader.ReadString('\n')
 		if err != nil {
-			fmt.Println("**irctcat error: failed to read new input line:", err.Error())
+			fmt.Println("** ircdog error: failed to read new input line:", err.Error())
 			connection.Disconnect()
 			return
 		}
 
 		err = connection.SendLine(strings.TrimRight(line, "\r\n"))
 		if err != nil {
-			fmt.Println("**irctcat error: failed to send line:", err.Error())
+			fmt.Println("** ircdog error: failed to send line:", err.Error())
 			connection.Disconnect()
 			return
 		}

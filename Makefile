@@ -4,7 +4,7 @@ WIN=$(BUILD)/win
 LINUX=$(BUILD)/linux
 OSX=$(BUILD)/osx
 ARM6=$(BUILD)/arm
-SOURCE=irctcat.go
+SOURCE=ircdog.go
 VERS=XXX
 
 .PHONY: all clean windows osx linux arm6
@@ -28,26 +28,26 @@ clean:
 windows:
 	GOOS=windows GOARCH=amd64 go build $(SOURCE)
 	$(call add-files,$(WIN))
-	mv irctcat.exe $(WIN)
-	cd $(WIN) && zip -r ../irctcat-$(VERS)-windows.zip *
+	mv ircdog.exe $(WIN)
+	cd $(WIN) && zip -r ../ircdog-$(VERS)-windows.zip *
 
 osx:
 	GOOS=darwin GOARCH=amd64 go build $(SOURCE)
 	$(call add-files,$(OSX))
-	mv irctcat $(OSX)
-	cd $(OSX) && tar -czvf ../irctcat-$(VERS)-osx.tgz *
+	mv ircdog $(OSX)
+	cd $(OSX) && tar -czvf ../ircdog-$(VERS)-osx.tgz *
 
 linux:
 	GOOS=linux GOARCH=amd64 go build $(SOURCE)
 	$(call add-files,$(LINUX))
-	mv irctcat $(LINUX)
-	cd $(LINUX) && tar -czvf ../irctcat-$(VERS)-linux.tgz *
+	mv ircdog $(LINUX)
+	cd $(LINUX) && tar -czvf ../ircdog-$(VERS)-linux.tgz *
 
 arm6:
 	GOARM=6 GOARCH=arm go build $(SOURCE)
 	$(call add-files,$(ARM6))
-	mv irctcat $(ARM6)
-	cd $(ARM6) && tar -czvf ../irctcat-$(VERS)-arm.tgz *
+	mv ircdog $(ARM6)
+	cd $(ARM6) && tar -czvf ../ircdog-$(VERS)-arm.tgz *
 
 deps:
 	go get -v -d
