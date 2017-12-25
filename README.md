@@ -6,7 +6,7 @@ This tool's mostly useful for IRC protocol developers who want to see exactly wh
 
 ---
 
-![Screenshot](./screenshot.png)
+![Screenshot](docs/screenshot.png)
 
 
 ## License
