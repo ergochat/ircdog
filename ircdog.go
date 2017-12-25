@@ -76,7 +76,10 @@ Options:
 				connection.Disconnect()
 				return
 			}
-			fmt.Println(line)
+
+			// print line
+			splitLine := lib.SplitLineIntoParts(line)
+			fmt.Println(lib.AnsiFormatLineParts(splitLine, true))
 
 			// respond to incoming PINGs
 			if !arguments["--nopings"].(bool) {
