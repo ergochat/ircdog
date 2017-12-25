@@ -4,6 +4,10 @@ ircdog is a simple wrapper over IRC that can respond to pings, and interprets fo
 
 This tool's mostly useful for IRC protocol developers who want to see exactly what a server sends/receives.
 
+---
+
+![Screenshot](./screenshot.png)
+
 
 ## License
 
