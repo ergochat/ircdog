@@ -5,5 +5,5 @@ package lib
 
 const (
 	// SemVer is the semantic version of this program
-	SemVer = "0.1.0-unreleased"
+	SemVer = "0.1.0"
 )
