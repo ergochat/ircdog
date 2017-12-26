@@ -5,7 +5,10 @@ This project adheres to [Semantic Versioning](http://semver.org/). For the purpo
 
 
 ## Unreleased
-New release of ircdog!
+Initial release of ircdog!
+
+ircdog supports connecting, responding to pings, displaying formatting, and optionally displaying the raw decoded messages with goshuirc escapes.
+
 
 ### Config Changes
 
