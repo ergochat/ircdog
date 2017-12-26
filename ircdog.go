@@ -14,6 +14,7 @@ import (
 
 	"github.com/goshuirc/irc-go/ircmsg"
 
+	colorable "github.com/mattn/go-colorable"
 	docopt "github.com/docopt/docopt-go"
 	"github.com/goshuirc/ircdog/lib"
 )
@@ -69,6 +70,7 @@ Options:
 	}
 
 	go func() {
+		colourablestdout := colorable.NewColorableStdout()
 		for {
 			line, err := connection.GetLine()
 			if err != nil {
@@ -79,7 +81,7 @@ Options:
 
 			// print line
 			splitLine := lib.SplitLineIntoParts(line)
-			fmt.Println(lib.AnsiFormatLineParts(splitLine, true))
+			fmt.Fprintln(colourablestdout, lib.AnsiFormatLineParts(splitLine, true))
 
 			// respond to incoming PINGs
 			if !arguments["--nopings"].(bool) {
