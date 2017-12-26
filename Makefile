@@ -10,8 +10,6 @@ VERS=XXX
 .PHONY: all clean windows osx linux arm6
 
 add-files = mkdir -p $1; \
-	cp oragono.yaml $1; \
-	cp oragono.motd $1; \
 	cp LICENSE $1; \
 	cp ./docs/README $1; \
 	mkdir -p $1/docs; \
