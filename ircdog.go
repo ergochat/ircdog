@@ -15,9 +15,9 @@ import (
 	"github.com/goshuirc/irc-go/ircfmt"
 	"github.com/goshuirc/irc-go/ircmsg"
 
-	colorable "github.com/mattn/go-colorable"
 	docopt "github.com/docopt/docopt-go"
 	"github.com/goshuirc/ircdog/lib"
+	colorable "github.com/mattn/go-colorable"
 )
 
 func main() {
@@ -98,9 +98,9 @@ Options:
 		for {
 			line, err := connection.GetLine()
 			if err != nil {
-				fmt.Println("Disconnected:", err.Error())
+				fmt.Println("** ircdog disconnected:", err.Error())
 				connection.Disconnect()
-				return
+				os.Exit(0)
 			}
 
 			// print line
