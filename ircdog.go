@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/goshuirc/irc-go/ircfmt"
 	"github.com/goshuirc/irc-go/ircmsg"
 
 	colorable "github.com/mattn/go-colorable"
@@ -35,10 +36,33 @@ Usage:
 	ircdog -h | --help
 	ircdog --version
 
+Goshuirc Escapes:
+	When the -r option is used, lines are displayed with the goshuirc escapes
+	rather than as real formatted lines. goshuirc uses $ as an escape character
+	along with these specific escapes:
+
+	-------------------------------
+	 Name          | Escape | Raw
+	-------------------------------
+	 Dollarsign    |   $$   |  $
+	 Bold          |   $b   | 0x02
+	 Colour        |   $c   | 0x03
+	 Monospace     |   $m   | 0x11
+	 Italic        |   $i   | 0x1d
+	 Strikethrough |   $s   | 0x1e
+	 Underscore    |   $u   | 0x1f
+	 Reset         |   $r   | 0x0f
+	-------------------------------
+
+	Colours are followed by the specific colour code(s) in square brackets. For
+	example, "$c[red,blue]" means red foreground, blue background. If there are
+	no colour codes following, a pair of empty brackets like "$c[]" is used.
+
 Options:
 	--tls               Connect using TLS.
 	--tls-noverify      Don't verify the provided TLS certificates.
 	-p --nopings        Don't automatically respond to incoming pings.
+	-r --raw-incoming   Display incoming lines with raw goshuirc escapes.
 	-h --help           Show this screen.
 	--version           Show version.`
 
@@ -80,8 +104,12 @@ Options:
 			}
 
 			// print line
-			splitLine := lib.SplitLineIntoParts(line)
-			fmt.Fprintln(colourablestdout, lib.AnsiFormatLineParts(splitLine, true))
+			if arguments["--raw-incoming"].(bool) {
+				fmt.Println(ircfmt.Escape(line))
+			} else {
+				splitLine := lib.SplitLineIntoParts(line)
+				fmt.Fprintln(colourablestdout, lib.AnsiFormatLineParts(splitLine, true))
+			}
 
 			// respond to incoming PINGs
 			if !arguments["--nopings"].(bool) {
