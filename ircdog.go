@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -61,6 +62,7 @@ Goshuirc Escapes:
 Options:
 	--tls               Connect using TLS.
 	--tls-noverify      Don't verify the provided TLS certificates.
+	--listen=<address>  Listen on an address like ":7778", pass through traffic.
 	-p --nopings        Don't automatically respond to incoming pings.
 	-r --raw-incoming   Display incoming lines with raw goshuirc escapes.
 	-h --help           Show this screen.
@@ -87,60 +89,148 @@ Options:
 		}
 	}
 
-	// create new connection
-	connection, err := lib.NewConnection(connectionConfig)
-	if err != nil {
-		log.Fatalf("Could not create new connection: %s\n", err.Error())
-	}
+	colourablestdout := colorable.NewColorableStdout()
 
-	go func() {
-		colourablestdout := colorable.NewColorableStdout()
+	if arguments["--listen"] == nil {
+		// not listening, just connect as usual
+		// create new connection
+		connection, err := lib.NewConnection(connectionConfig)
+		if err != nil {
+			log.Fatalf("Could not create new connection: %s\n", err.Error())
+		}
+
+		go func() {
+			for {
+				line, err := connection.GetLine()
+				if err != nil {
+					fmt.Println("** ircdog disconnected:", err.Error())
+					connection.Disconnect()
+					os.Exit(0)
+				}
+
+				// print line
+				if arguments["--raw-incoming"].(bool) {
+					fmt.Println(ircfmt.Escape(line))
+				} else {
+					splitLine := lib.SplitLineIntoParts(line)
+					fmt.Fprintln(colourablestdout, lib.AnsiFormatLineParts(splitLine, true))
+				}
+
+				// respond to incoming PINGs
+				if !arguments["--nopings"].(bool) {
+					msg, err := ircmsg.ParseLine(line)
+					if err != nil {
+						fmt.Println("** ircdog warning: this line looks incorrect **")
+						continue
+					}
+					if msg.Command == "PING" {
+						connection.SendMessage(true, nil, "", "PONG", msg.Params...)
+					}
+					//TODO(dan): Respond to CTCP PING/VERSION to make sure we don't get killed by nets
+				}
+			}
+		}()
+
+		// read incoming lines
+		reader := bufio.NewReader(os.Stdin)
 		for {
-			line, err := connection.GetLine()
+			line, err := reader.ReadString('\n')
 			if err != nil {
-				fmt.Println("** ircdog disconnected:", err.Error())
+				fmt.Println("** ircdog error: failed to read new input line:", err.Error())
+				connection.Disconnect()
+				return
+			}
+
+			err = connection.SendLine(strings.TrimRight(line, "\r\n"))
+			if err != nil {
+				fmt.Println("** ircdog error: failed to send line:", err.Error())
+				connection.Disconnect()
+				return
+			}
+		}
+
+	} else {
+		// doing the listening dance, yay
+		listenAddress := arguments["--listen"].(string)
+
+		ln, err := net.Listen("tcp", listenAddress)
+		if err != nil {
+			fmt.Println("** ircdog could not open listener:", err.Error())
+			fmt.Println("Listener should have the form [host]:<port> like localhost:6667 or :8889")
+			os.Exit(1)
+		}
+
+		fmt.Println("** ircdog listening on", listenAddress)
+		fmt.Println("** ircdog will connect once we have a client connected on the listening port")
+
+		// make the client connection
+		clientConn, err := ln.Accept()
+		if err != nil {
+			fmt.Println("** ircdog could not accept incoming connection from listener:", err.Error())
+			os.Exit(1)
+		}
+
+		client := lib.MakeSocket(clientConn)
+
+		// create new server connection
+		connection, err := lib.NewConnection(connectionConfig)
+		if err != nil {
+			log.Fatalf("Could not create new connection: %s\n", err.Error())
+		}
+
+		go func() {
+			colourablestdout := colorable.NewColorableStdout()
+			for {
+				line, err := connection.GetLine()
+				if err != nil {
+					fmt.Println("** ircdog server disconnected:", err.Error())
+					client.Disconnect()
+					connection.Disconnect()
+					os.Exit(0)
+				}
+
+				// print line
+				if arguments["--raw-incoming"].(bool) {
+					fmt.Println("<- ", ircfmt.Escape(line))
+				} else {
+					splitLine := lib.SplitLineIntoParts(line)
+					fmt.Fprintln(colourablestdout, "<-  "+lib.AnsiFormatLineParts(splitLine, true))
+				}
+
+				err = client.SendLine(line)
+				if err != nil {
+					fmt.Println("** ircdog couldn't send line to client:", err.Error())
+					client.Disconnect()
+					connection.Disconnect()
+					os.Exit(0)
+				}
+			}
+		}()
+
+		for {
+			line, err := client.GetLine()
+			if err != nil {
+				fmt.Println("** ircdog client disconnected:", err.Error())
+				client.Disconnect()
 				connection.Disconnect()
 				os.Exit(0)
 			}
 
 			// print line
 			if arguments["--raw-incoming"].(bool) {
-				fmt.Println(ircfmt.Escape(line))
+				fmt.Println(" ->", ircfmt.Escape(line))
 			} else {
 				splitLine := lib.SplitLineIntoParts(line)
-				fmt.Fprintln(colourablestdout, lib.AnsiFormatLineParts(splitLine, true))
+				fmt.Fprintln(colourablestdout, " -> "+lib.AnsiFormatLineParts(splitLine, true))
 			}
 
-			// respond to incoming PINGs
-			if !arguments["--nopings"].(bool) {
-				msg, err := ircmsg.ParseLine(line)
-				if err != nil {
-					fmt.Println("** ircdog warning: this line looks incorrect **")
-					continue
-				}
-				if msg.Command == "PING" {
-					connection.SendMessage(true, nil, "", "PONG", msg.Params...)
-				}
-				//TODO(dan): Respond to CTCP PING/VERSION to make sure we don't get killed by nets
+			err = connection.SendLine(line)
+			if err != nil {
+				fmt.Println("** ircdog couldn't send line to server:", err.Error())
+				client.Disconnect()
+				connection.Disconnect()
+				os.Exit(0)
 			}
-		}
-	}()
-
-	// read incoming lines
-	reader := bufio.NewReader(os.Stdin)
-	for {
-		line, err := reader.ReadString('\n')
-		if err != nil {
-			fmt.Println("** ircdog error: failed to read new input line:", err.Error())
-			connection.Disconnect()
-			return
-		}
-
-		err = connection.SendLine(strings.TrimRight(line, "\r\n"))
-		if err != nil {
-			fmt.Println("** ircdog error: failed to send line:", err.Error())
-			connection.Disconnect()
-			return
 		}
 	}
 }

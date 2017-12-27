@@ -62,6 +62,16 @@ func ConnectSocket(host string, port int, useTLS bool, tlsConfig *tls.Config) (*
 	return &s, nil
 }
 
+// MakeSocket makes a socket from the given connection.
+func MakeSocket(conn net.Conn) *Socket {
+	return &Socket{
+		connected:  true,
+		connection: conn,
+		reader:     bufio.NewReader(conn),
+		writer:     bufio.NewWriter(conn),
+	}
+}
+
 // GetLine returns a single IRC line from the socket.
 func (s *Socket) GetLine() (string, error) {
 	if !s.Connected() {
