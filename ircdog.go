@@ -108,7 +108,7 @@ Options:
 	}
 
 	// italics formatting code
-	useItalics := !arguments["--no-italics"]
+	useItalics := !arguments["--no-italics"].(bool)
 
 	if arguments["--listen"] == nil {
 		// not listening, just connect as usual
@@ -254,7 +254,7 @@ Options:
 				connection.Disconnect()
 				os.Exit(0)
 			}
-			
+
 			msg, err := ircmsg.ParseLine(line)
 			if err != nil {
 				fmt.Println("** ircdog warning: this next line looks incorrect, we're not formatting it **")
