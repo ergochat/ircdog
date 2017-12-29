@@ -151,6 +151,9 @@ Options:
 
 	} else {
 		// doing the listening dance, yay
+		// use a mutext to make sure client and server don't talk over each other
+		var outputMutex sync.Mutex
+
 		listenAddress := arguments["--listen"].(string)
 
 		ln, err := net.Listen("tcp", listenAddress)
@@ -191,10 +194,14 @@ Options:
 
 				// print line
 				if arguments["--raw-incoming"].(bool) {
+					outputMutex.Lock()
 					fmt.Println("<- ", ircfmt.Escape(line))
+					outputMutex.Unlock()
 				} else {
-					splitLine := lib.SplitLineIntoParts(line)
-					fmt.Fprintln(colourablestdout, "<-  "+lib.AnsiFormatLineParts(splitLine, true))
+					splitLine := lib.AnsiFormatLineParts(lib.SplitLineIntoParts(line), true)
+					outputMutex.Lock()
+					fmt.Fprintln(colourablestdout, "<-  "+splitLine)
+					outputMutex.Unlock()
 				}
 
 				err = client.SendLine(line)
@@ -218,10 +225,13 @@ Options:
 
 			// print line
 			if arguments["--raw-incoming"].(bool) {
+				outputMutex.Lock()
 				fmt.Println(" ->", ircfmt.Escape(line))
+				outputMutex.Unlock()
 			} else {
-				splitLine := lib.SplitLineIntoParts(line)
-				fmt.Fprintln(colourablestdout, " -> "+lib.AnsiFormatLineParts(splitLine, true))
+				splitLine := lib.AnsiFormatLineParts(lib.SplitLineIntoParts(line), true)
+				fmt.Fprintln(colourablestdout, " -> "+splitLine)
+				outputMutex.Unlock()
 			}
 
 			err = connection.SendLine(line)
