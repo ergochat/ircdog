@@ -217,8 +217,10 @@ Options:
 
 				msg, err := ircmsg.ParseLine(line)
 				if err != nil {
+					outputMutex.Lock()
 					fmt.Println("** ircdog warning: this next line looks incorrect, we're not formatting it **")
 					fmt.Println("<- ", line)
+					outputMutex.Unlock()
 					continue
 				}
 
@@ -257,8 +259,10 @@ Options:
 
 			msg, err := ircmsg.ParseLine(line)
 			if err != nil {
+				outputMutex.Lock()
 				fmt.Println("** ircdog warning: this next line looks incorrect, we're not formatting it **")
 				fmt.Println(" ->", line)
+				outputMutex.Unlock()
 				continue
 			}
 
@@ -269,6 +273,7 @@ Options:
 					fmt.Println(" ->", ircfmt.Escape(line))
 					outputMutex.Unlock()
 				} else {
+					outputMutex.Lock()
 					splitLine := lib.AnsiFormatLineParts(lib.SplitLineIntoParts(line), useItalics)
 					fmt.Fprintln(colourablestdout, " -> "+splitLine)
 					outputMutex.Unlock()
