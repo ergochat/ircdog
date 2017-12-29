@@ -4,6 +4,13 @@ All notable changes to ircdog will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/). For the purposes of versioning, we consider the "public API" to refer to the configuration files and CLI.
 
 
+## [0.2.1] - 2017-12-29
+Fix for a silly bug. Guess I should add some proper tests at some point!
+
+### Fixed
+* Fixed a locking bug that meant the `--listen` functionality was totally broken! Thanks [@jwheare](https://github.com/jwheare) for finding this bug!
+
+
 ## [0.2.0] - 2017-12-29
 More formatting codes! Easier to see CTCP delimiters! Hiding messages and snooping on traffic!
 
