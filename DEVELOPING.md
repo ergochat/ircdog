@@ -51,7 +51,7 @@ The `vendor/` directory holds our dependencies. When we import new repos, we nee
 To update this folder:
 
 1. Install https://github.com/golang/dep
-2. `cd` to Oragono folder
+2. `cd` to ircdog's folder
 3. `dep ensure -update`
 4. `cd vendor`
 5. Commit the changes with the message `"Updated packages"`
@@ -67,4 +67,4 @@ To debug a hang, the best thing to do is to get a stack trace. Go's nice, and yo
 
     $ kill -ABRT <procid>
 
-This will kill Oragono and print out a stack trace for you to take a look at.
+This will kill ircdog and print out a stack trace for you to take a look at.
