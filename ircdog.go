@@ -65,6 +65,7 @@ Options:
 	--tls-noverify      Don't verify the provided TLS certificates.
 	--listen=<address>  Listen on an address like ":7778", pass through traffic.
 	--hide=<messages>   Comma-separated list of commands/numerics to not print.
+	--no-italics        Don't use the ANSI italics code to represent italics.
 	-p --nopings        Don't automatically respond to incoming pings.
 	-r --raw-incoming   Display incoming lines with raw goshuirc escapes.
 	-h --help           Show this screen.
@@ -106,6 +107,9 @@ Options:
 		}
 	}
 
+	// italics formatting code
+	useItalics := !arguments["--no-italics"]
+
 	if arguments["--listen"] == nil {
 		// not listening, just connect as usual
 		// create new connection
@@ -136,7 +140,7 @@ Options:
 						fmt.Println(ircfmt.Escape(line))
 					} else {
 						splitLine := lib.SplitLineIntoParts(line)
-						fmt.Fprintln(colourablestdout, lib.AnsiFormatLineParts(splitLine, true))
+						fmt.Fprintln(colourablestdout, lib.AnsiFormatLineParts(splitLine, useItalics))
 					}
 				}
 
@@ -225,7 +229,7 @@ Options:
 						fmt.Println("<- ", ircfmt.Escape(line))
 						outputMutex.Unlock()
 					} else {
-						splitLine := lib.AnsiFormatLineParts(lib.SplitLineIntoParts(line), true)
+						splitLine := lib.AnsiFormatLineParts(lib.SplitLineIntoParts(line), useItalics)
 						outputMutex.Lock()
 						fmt.Fprintln(colourablestdout, "<-  "+splitLine)
 						outputMutex.Unlock()
@@ -265,7 +269,7 @@ Options:
 					fmt.Println(" ->", ircfmt.Escape(line))
 					outputMutex.Unlock()
 				} else {
-					splitLine := lib.AnsiFormatLineParts(lib.SplitLineIntoParts(line), true)
+					splitLine := lib.AnsiFormatLineParts(lib.SplitLineIntoParts(line), useItalics)
 					fmt.Fprintln(colourablestdout, " -> "+splitLine)
 					outputMutex.Unlock()
 				}
