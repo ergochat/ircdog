@@ -31,6 +31,7 @@ var (
 	}
 
 	italicOn = makeANSI("3")
+	reverseOn = makeANSI("7")
 )
 
 func makeANSI(code string) string {
@@ -46,15 +47,22 @@ type formattedPart struct {
 	Strikethrough bool
 	Underlined    bool
 	Italic        bool
+	Reverse       bool
 	Content       string
 }
 
 func formatLinePart(rawPart string, outputItalics bool) string {
-	// []rune so that we loop over chars (keeping UTF-8 chars intact)
-	remaining := []rune(ircfmt.Escape(rawPart))
+	// do ircfmt escaping
+	remainingString := ircfmt.Escape(rawPart)
+
+	// manually show CTCP escape character
+	remainingString = strings.Replace(remainingString, "\x01", "$v$b[CTCP]$b$v", -1)
+
+	// make it a []rune so that we loop over chars (keeping UTF-8 chars intact)
+	remaining := []rune(remainingString)
 	var lineParts []formattedPart
 	var buffer string
-	var isBold, isItalic, isMonospace, isStrikethrough, isUnderline bool
+	var isBold, isItalic,  isReverse, isMonospace, isStrikethrough, isUnderline bool
 	var storedFgColour, storedBgColour string
 
 	for 0 < len(remaining) {
@@ -79,6 +87,7 @@ func formatLinePart(rawPart string, outputItalics bool) string {
 					Strikethrough: isStrikethrough,
 					Underlined:    isUnderline,
 					Italic:        isItalic,
+					Reverse:       isReverse,
 					Content:       buffer,
 				})
 				buffer = ""
@@ -88,6 +97,8 @@ func formatLinePart(rawPart string, outputItalics bool) string {
 				isBold = !isBold
 			} else if char == 'i' {
 				isItalic = !isItalic
+			} else if char == 'v' {
+				isReverse = !isReverse
 			} else if char == 's' {
 				isStrikethrough = !isStrikethrough
 			} else if char == 'u' {
@@ -147,6 +158,7 @@ func formatLinePart(rawPart string, outputItalics bool) string {
 			Strikethrough: isStrikethrough,
 			Underlined:    isUnderline,
 			Italic:        isItalic,
+			Reverse:       isReverse,
 			Content:       buffer,
 		})
 	}
@@ -188,6 +200,11 @@ func formatLinePart(rawPart string, outputItalics bool) string {
 			message += ansi.ColorCode(part.ForeColour + additional)
 		} else if additional != "" {
 			message += ansi.ColorCode("default" + additional)
+		}
+
+		// we do reverse ourselves. lib supports it, this just makes sure we don't mess it up.
+		if part.Reverse {
+			message += reverseOn
 		}
 
 		// paste it all together
