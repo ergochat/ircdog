@@ -12,6 +12,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/goshuirc/irc-go/ircfmt"
 	"github.com/goshuirc/irc-go/ircmsg"
@@ -63,6 +64,7 @@ Options:
 	--tls               Connect using TLS.
 	--tls-noverify      Don't verify the provided TLS certificates.
 	--listen=<address>  Listen on an address like ":7778", pass through traffic.
+	--hide=<messages>   Comma-separated list of commands/numerics to not print.
 	-p --nopings        Don't automatically respond to incoming pings.
 	-r --raw-incoming   Display incoming lines with raw goshuirc escapes.
 	-h --help           Show this screen.
@@ -91,10 +93,23 @@ Options:
 
 	colourablestdout := colorable.NewColorableStdout()
 
+	// list of commands/numerics to not print
+	var hiddenString string
+	if arguments["--hide"] != nil {
+		hiddenString = arguments["--hide"].(string)
+	}
+	hiddenList := strings.Split(hiddenString, ",")
+	hiddenCommands := make(map[string]bool)
+	for _, cmd := range hiddenList {
+		if 0 < len(cmd) {
+			hiddenCommands[strings.ToUpper(cmd)] = true
+		}
+	}
+
 	if arguments["--listen"] == nil {
 		// not listening, just connect as usual
 		// create new connection
-		connection, err := lib.NewConnection(connectionConfig)
+		connection, err := lib.NewConnection(connectionConfig, &hiddenCommands)
 		if err != nil {
 			log.Fatalf("Could not create new connection: %s\n", err.Error())
 		}
@@ -108,21 +123,25 @@ Options:
 					os.Exit(0)
 				}
 
+				msg, err := ircmsg.ParseLine(line)
+				if err != nil {
+					fmt.Println("** ircdog warning: this next line looks incorrect, we're not formatting it **")
+					fmt.Println(line)
+					continue
+				}
+
 				// print line
-				if arguments["--raw-incoming"].(bool) {
-					fmt.Println(ircfmt.Escape(line))
-				} else {
-					splitLine := lib.SplitLineIntoParts(line)
-					fmt.Fprintln(colourablestdout, lib.AnsiFormatLineParts(splitLine, true))
+				if !hiddenCommands[strings.ToUpper(msg.Command)] {
+					if arguments["--raw-incoming"].(bool) {
+						fmt.Println(ircfmt.Escape(line))
+					} else {
+						splitLine := lib.SplitLineIntoParts(line)
+						fmt.Fprintln(colourablestdout, lib.AnsiFormatLineParts(splitLine, true))
+					}
 				}
 
 				// respond to incoming PINGs
 				if !arguments["--nopings"].(bool) {
-					msg, err := ircmsg.ParseLine(line)
-					if err != nil {
-						fmt.Println("** ircdog warning: this line looks incorrect **")
-						continue
-					}
 					if msg.Command == "PING" {
 						connection.SendMessage(true, nil, "", "PONG", msg.Params...)
 					}
@@ -176,7 +195,7 @@ Options:
 		client := lib.MakeSocket(clientConn)
 
 		// create new server connection
-		connection, err := lib.NewConnection(connectionConfig)
+		connection, err := lib.NewConnection(connectionConfig, &hiddenCommands)
 		if err != nil {
 			log.Fatalf("Could not create new connection: %s\n", err.Error())
 		}
@@ -192,16 +211,25 @@ Options:
 					os.Exit(0)
 				}
 
+				msg, err := ircmsg.ParseLine(line)
+				if err != nil {
+					fmt.Println("** ircdog warning: this next line looks incorrect, we're not formatting it **")
+					fmt.Println("<- ", line)
+					continue
+				}
+
 				// print line
-				if arguments["--raw-incoming"].(bool) {
-					outputMutex.Lock()
-					fmt.Println("<- ", ircfmt.Escape(line))
-					outputMutex.Unlock()
-				} else {
-					splitLine := lib.AnsiFormatLineParts(lib.SplitLineIntoParts(line), true)
-					outputMutex.Lock()
-					fmt.Fprintln(colourablestdout, "<-  "+splitLine)
-					outputMutex.Unlock()
+				if !hiddenCommands[strings.ToUpper(msg.Command)] {
+					if arguments["--raw-incoming"].(bool) {
+						outputMutex.Lock()
+						fmt.Println("<- ", ircfmt.Escape(line))
+						outputMutex.Unlock()
+					} else {
+						splitLine := lib.AnsiFormatLineParts(lib.SplitLineIntoParts(line), true)
+						outputMutex.Lock()
+						fmt.Fprintln(colourablestdout, "<-  "+splitLine)
+						outputMutex.Unlock()
+					}
 				}
 
 				err = client.SendLine(line)
@@ -222,16 +250,25 @@ Options:
 				connection.Disconnect()
 				os.Exit(0)
 			}
+			
+			msg, err := ircmsg.ParseLine(line)
+			if err != nil {
+				fmt.Println("** ircdog warning: this next line looks incorrect, we're not formatting it **")
+				fmt.Println(" ->", line)
+				continue
+			}
 
 			// print line
-			if arguments["--raw-incoming"].(bool) {
-				outputMutex.Lock()
-				fmt.Println(" ->", ircfmt.Escape(line))
-				outputMutex.Unlock()
-			} else {
-				splitLine := lib.AnsiFormatLineParts(lib.SplitLineIntoParts(line), true)
-				fmt.Fprintln(colourablestdout, " -> "+splitLine)
-				outputMutex.Unlock()
+			if !hiddenCommands[strings.ToUpper(msg.Command)] {
+				if arguments["--raw-incoming"].(bool) {
+					outputMutex.Lock()
+					fmt.Println(" ->", ircfmt.Escape(line))
+					outputMutex.Unlock()
+				} else {
+					splitLine := lib.AnsiFormatLineParts(lib.SplitLineIntoParts(line), true)
+					fmt.Fprintln(colourablestdout, " -> "+splitLine)
+					outputMutex.Unlock()
+				}
 			}
 
 			err = connection.SendLine(line)

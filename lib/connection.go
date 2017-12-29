@@ -20,12 +20,13 @@ type ConnectionConfig struct {
 }
 
 type Connection struct {
-	config ConnectionConfig
-	socket *Socket
+	config         ConnectionConfig
+	socket         *Socket
+	hiddenCommands *map[string]bool
 }
 
 // NewConnection returns a new Connection.
-func NewConnection(config ConnectionConfig) (*Connection, error) {
+func NewConnection(config ConnectionConfig, hiddenCommands *map[string]bool) (*Connection, error) {
 	if config.Port < 1 || 65535 < config.Port {
 		return nil, errors.New("Port must be a number 1-65535")
 	}
@@ -36,8 +37,9 @@ func NewConnection(config ConnectionConfig) (*Connection, error) {
 	}
 
 	return &Connection{
-		config: config,
-		socket: socket,
+		config:         config,
+		socket:         socket,
+		hiddenCommands: hiddenCommands,
 	}, nil
 }
 
@@ -59,7 +61,7 @@ func (conn *Connection) SendMessage(print bool, tags *map[string]ircmsg.TagValue
 	}
 
 	line = strings.TrimRight(line, "\r\n")
-	if print {
+	if print && !(*conn.hiddenCommands)[strings.ToUpper(command)] {
 		fmt.Println(line)
 	}
 	conn.socket.SendLine(line)
