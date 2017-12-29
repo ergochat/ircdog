@@ -6,8 +6,7 @@ This tool's mostly useful for IRC protocol developers who want to see exactly wh
 
 ---
 
-![Screenshot](docs/screenshot.png)
-
+[![Example](docs/example.gif)](https://asciinema.org/a/bqmBrV8aIWDhvQqaxfpJrtj7r)
 
 ## License
 

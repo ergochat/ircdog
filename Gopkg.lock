@@ -1,28 +1,28 @@
-memo = ""
+memo = "e4ca0193bbe5e6a773a6b34fc5970bb789f39a684b2562a47668222a566e4da5"
 
 [[projects]]
-  branch = "master"
   name = "github.com/docopt/docopt-go"
   packages = ["."]
   revision = "784ddc588536785e7299f7272f39101f7faccc3f"
+  version = "0.6.2"
 
 [[projects]]
   branch = "master"
   name = "github.com/goshuirc/irc-go"
   packages = ["ircfmt","ircmsg"]
-  revision = "e028586483b7875e1173e3b80281a9b0a79fc00a"
+  revision = "55652e40960130aab4af2ec695e0c99b305d1e5b"
 
 [[projects]]
   branch = "master"
   name = "github.com/mattn/go-colorable"
   packages = ["."]
-  revision = "acb9493f2794fd0f820de7a27a217dafbb1b65ea"
+  revision = "6fcc0c1fd9b620311d821b106a400b35dc95c497"
 
 [[projects]]
-  branch = "master"
   name = "github.com/mattn/go-isatty"
   packages = ["."]
-  revision = "9622e0cc9d8f9be434ca605520ff9a16808fee47"
+  revision = "0360b2af4f38e8d38c7fce2a9f4e702702d73a39"
+  version = "v0.0.3"
 
 [[projects]]
   branch = "master"
@@ -34,4 +34,4 @@ memo = ""
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "90796e5a05ce440b41c768bd9af257005e470461"
+  revision = "83801418e1b59fb1880e363299581ee543af32ca"
