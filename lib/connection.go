@@ -6,7 +6,6 @@ package lib
 import (
 	"crypto/tls"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/goshuirc/irc-go/ircmsg"
@@ -17,6 +16,7 @@ type ConnectionConfig struct {
 	Port      int
 	TLS       bool
 	TLSConfig *tls.Config
+	Print     func(msg... string)
 }
 
 type Connection struct {
@@ -62,7 +62,7 @@ func (conn *Connection) SendMessage(print bool, tags *map[string]ircmsg.TagValue
 
 	line = strings.TrimRight(line, "\r\n")
 	if print && !(*conn.hiddenCommands)[strings.ToUpper(command)] {
-		fmt.Println(line)
+		conn.config.Print(line)
 	}
 	conn.socket.SendLine(line)
 	return nil
