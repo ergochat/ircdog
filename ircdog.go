@@ -106,7 +106,7 @@ Options:
 	connectionConfig := lib.ConnectionConfig{
 		Host: host,
 		Port: port,
-		TLS:  arguments["--tls"].(bool),
+		TLS:  arguments["--tls"].(bool) || arguments["--tls-noverify"].(bool),
 	}
 	if arguments["--tls-noverify"].(bool) {
 		connectionConfig.TLSConfig = &tls.Config{
