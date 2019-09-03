@@ -3,6 +3,19 @@
 
 package lib
 
+import "strings"
+
+var controlCodeReplacements = map[string]string{
+	"[[CTCP]]": "\x01",
+	"[[B]]":    "\x02",
+	"[[C]]":    "\x03",
+	"[[M]]":    "\x11",
+	"[[I]]":    "\x1d",
+	"[[S]]":    "\x1e",
+	"[[U]]":    "\x1f",
+	"[[R]]":    "\x0f",
+}
+
 // SplitLineIntoParts splits the given IRC line into separate parts.
 func SplitLineIntoParts(line string) []string {
 	var lineParts []string
@@ -49,4 +62,13 @@ func SplitLineIntoParts(line string) []string {
 	lineParts = append(lineParts, buffer)
 
 	return lineParts
+}
+
+// ReplaceControlCodes applies our control code replacements to the line.
+func ReplaceControlCodes(line string) string {
+	for k, v := range controlCodeReplacements {
+		line = strings.Replace(line, k, v, -1)
+	}
+
+	return line
 }

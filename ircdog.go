@@ -60,12 +60,34 @@ Goshuirc Escapes:
 	example, "$c[red,blue]" means red foreground, blue background. If there are
 	no colour codes following, a pair of empty brackets like "$c[]" is used.
 
+Sending Escapes:
+	To send special characters like colour codes and CTCP messages, ircdog
+	supports a few escape characters that get converted before messages are
+	sent. These escapes are case-sensitive:
+
+	---------------------------------
+	 Name          | Escape   | Raw
+	---------------------------------
+	 CTCP Escape   | [[CTCP]] | 0x01
+	 Bold          | [[B]]    | 0x02
+	 Colour        | [[C]]    | 0x03
+	 Monospace     | [[M]]    | 0x11
+	 Italic        | [[I]]    | 0x1d
+	 Strikethrough | [[S]]    | 0x1e
+	 Underscore    | [[U]]    | 0x1f
+	 Reset         | [[R]]    | 0x0f
+	---------------------------------
+
+	These escapes are only enabled in standard mode (not listening mode),
+	and can be disabled with the --no-controls option.
+
 Options:
 	--tls               Connect using TLS.
 	--tls-noverify      Don't verify the provided TLS certificates.
 	--listen=<address>  Listen on an address like ":7778", pass through traffic.
 	--hide=<messages>   Comma-separated list of commands/numerics to not print.
 	--no-italics        Don't use the ANSI italics code to represent italics.
+	--no-controls       Don't use the control character escapes.
 	-p --nopings        Don't automatically respond to incoming pings.
 	-r --raw-incoming   Display incoming lines with raw goshuirc escapes.
 	-h --help           Show this screen.
@@ -109,6 +131,9 @@ Options:
 
 	// italics formatting code
 	useItalics := !arguments["--no-italics"].(bool)
+
+	// control code replacements
+	useControlCodeReplacements := !arguments["--no-controls"].(bool)
 
 	if arguments["--listen"] == nil {
 		// not listening, just connect as usual
@@ -162,6 +187,10 @@ Options:
 				fmt.Println("** ircdog error: failed to read new input line:", err.Error())
 				connection.Disconnect()
 				return
+			}
+
+			if useControlCodeReplacements {
+				line = lib.ReplaceControlCodes(line)
 			}
 
 			err = connection.SendLine(strings.TrimRight(line, "\r\n"))
