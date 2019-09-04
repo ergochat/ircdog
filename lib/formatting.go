@@ -30,7 +30,7 @@ var (
 		"light grey":  "white",
 	}
 
-	italicOn = makeANSI("3")
+	italicOn  = makeANSI("3")
 	reverseOn = makeANSI("7")
 )
 
@@ -62,7 +62,7 @@ func formatLinePart(rawPart string, outputItalics bool) string {
 	remaining := []rune(remainingString)
 	var lineParts []formattedPart
 	var buffer string
-	var isBold, isItalic,  isReverse, isMonospace, isStrikethrough, isUnderline bool
+	var isBold, isItalic, isReverse, isMonospace, isStrikethrough, isUnderline bool
 	var storedFgColour, storedBgColour string
 
 	for 0 < len(remaining) {

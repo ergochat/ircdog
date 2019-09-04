@@ -53,7 +53,7 @@ func (conn *Connection) GetLine() (string, error) {
 }
 
 // SendMessage assembles and sends an IRC message to the socket.
-func (conn *Connection) SendMessage(print bool, tags *map[string]ircmsg.TagValue, prefix string, command string, params ...string) error {
+func (conn *Connection) SendMessage(print bool, tags map[string]string, prefix string, command string, params ...string) error {
 	message := ircmsg.MakeMessage(tags, prefix, command, params...)
 	line, err := message.Line()
 	if err != nil {
