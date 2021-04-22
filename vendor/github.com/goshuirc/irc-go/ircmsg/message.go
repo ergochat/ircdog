@@ -35,23 +35,36 @@ const (
 var (
 	// ErrorLineIsEmpty indicates that the given IRC line was empty.
 	ErrorLineIsEmpty = errors.New("Line is empty")
+
 	// ErrorLineContainsBadChar indicates that the line contained invalid characters
 	ErrorLineContainsBadChar = errors.New("Line contains invalid characters")
-	// ErrorLineTooLong indicates that the message exceeded the maximum tag length
-	// (the name references 417 ERR_INPUTTOOLONG; we reserve the right to return it
-	// for messages that exceed the non-tag length limit)
-	ErrorLineTooLong = errors.New("Line could not be parsed because a specified length limit was exceeded")
-	// ErrorInvalidTagContent indicates that a tag value was invalid
-	ErrorInvalidTagContent = errors.New("Line could not be parsed because it contained an invalid tag value")
 
+	// ErrorBodyTooLong indicates that the message body exceeded the specified
+	// length limit (typically 512 bytes). This error is non-fatal; if encountered
+	// when parsing a message, the message is parsed up to the length limit, and
+	// if encountered when serializing a message, the message is truncated to the limit.
+	ErrorBodyTooLong = errors.New("Line body exceeded the specified length limit; outgoing messages will be truncated")
+
+	// ErrorTagsTooLong indicates that the message exceeded the maximum tag length
+	// (the specified response on the server side is 417 ERR_INPUTTOOLONG).
+	ErrorTagsTooLong = errors.New("Line could not be processed because its tag data exceeded the length limit")
+
+	// ErrorInvalidTagContent indicates that a tag name or value was invalid
+	ErrorInvalidTagContent = errors.New("Line could not be processed because it contained an invalid tag name or value")
+
+	// ErrorCommandMissing indicates that an IRC message was invalid because it lacked a command.
 	ErrorCommandMissing = errors.New("IRC messages MUST have a command")
-	ErrorBadParam       = errors.New("Cannot have an empty param, a param with spaces, or a param that starts with ':' before the last parameter")
+
+	// ErrorBadParam indicates that an IRC message could not be serialized because
+	// its parameters violated the syntactic constraints on IRC parameters:
+	// non-final parameters cannot be empty, contain a space, or start with `:`.
+	ErrorBadParam = errors.New("Cannot have an empty param, a param with spaces, or a param that starts with ':' before the last parameter")
 )
 
-// IRCMessage represents an IRC message, as defined by the RFCs and as
+// Message represents an IRC message, as defined by the RFCs and as
 // extended by the IRCv3 Message Tags specification with the introduction
 // of message tags.
-type IRCMessage struct {
+type Message struct {
 	Prefix         string
 	Command        string
 	Params         []string
@@ -64,12 +77,12 @@ type IRCMessage struct {
 // will be encoded as a "trailing parameter" (preceded by a colon). This is
 // almost never necessary and should not be used except when having to interact
 // with broken implementations that don't correctly interpret IRC messages.
-func (msg *IRCMessage) ForceTrailing() {
+func (msg *Message) ForceTrailing() {
 	msg.forceTrailing = true
 }
 
 // GetTag returns whether a tag is present, and if so, what its value is.
-func (msg *IRCMessage) GetTag(tagName string) (present bool, value string) {
+func (msg *Message) GetTag(tagName string) (present bool, value string) {
 	if len(tagName) == 0 {
 		return
 	} else if tagName[0] == '+' {
@@ -82,13 +95,13 @@ func (msg *IRCMessage) GetTag(tagName string) (present bool, value string) {
 }
 
 // HasTag returns whether a tag is present.
-func (msg *IRCMessage) HasTag(tagName string) (present bool) {
+func (msg *Message) HasTag(tagName string) (present bool) {
 	present, _ = msg.GetTag(tagName)
 	return
 }
 
 // SetTag sets a tag.
-func (msg *IRCMessage) SetTag(tagName, tagValue string) {
+func (msg *Message) SetTag(tagName, tagValue string) {
 	if len(tagName) == 0 {
 		return
 	} else if tagName[0] == '+' {
@@ -105,7 +118,7 @@ func (msg *IRCMessage) SetTag(tagName, tagValue string) {
 }
 
 // DeleteTag deletes a tag.
-func (msg *IRCMessage) DeleteTag(tagName string) {
+func (msg *Message) DeleteTag(tagName string) {
 	if len(tagName) == 0 {
 		return
 	} else if tagName[0] == '+' {
@@ -116,14 +129,14 @@ func (msg *IRCMessage) DeleteTag(tagName string) {
 }
 
 // UpdateTags is a convenience to set multiple tags at once.
-func (msg *IRCMessage) UpdateTags(tags map[string]string) {
+func (msg *Message) UpdateTags(tags map[string]string) {
 	for name, value := range tags {
 		msg.SetTag(name, value)
 	}
 }
 
 // AllTags returns all tags as a single map.
-func (msg *IRCMessage) AllTags() (result map[string]string) {
+func (msg *Message) AllTags() (result map[string]string) {
 	result = make(map[string]string, len(msg.tags)+len(msg.clientOnlyTags))
 	for name, value := range msg.tags {
 		result[name] = value
@@ -135,23 +148,23 @@ func (msg *IRCMessage) AllTags() (result map[string]string) {
 }
 
 // ClientOnlyTags returns the client-only tags (the tags with the + prefix).
-// The returned map may be internal storage of the IRCMessage object and
+// The returned map may be internal storage of the Message object and
 // should not be modified.
-func (msg *IRCMessage) ClientOnlyTags() map[string]string {
+func (msg *Message) ClientOnlyTags() map[string]string {
 	return msg.clientOnlyTags
 }
 
 // ParseLine creates and returns a message from the given IRC line.
-func ParseLine(line string) (ircmsg IRCMessage, err error) {
+func ParseLine(line string) (ircmsg Message, err error) {
 	return parseLine(line, 0, 0)
 }
 
-// ParseLineStrict creates and returns an IRCMessage from the given IRC line,
+// ParseLineStrict creates and returns an Message from the given IRC line,
 // taking the maximum length into account and truncating the message as appropriate.
 // If fromClient is true, it enforces the client limit on tag data length (4094 bytes),
 // allowing the server to return ERR_INPUTTOOLONG as appropriate. If truncateLen is
 // nonzero, it is the length at which the non-tag portion of the message is truncated.
-func ParseLineStrict(line string, fromClient bool, truncateLen int) (ircmsg IRCMessage, err error) {
+func ParseLineStrict(line string, fromClient bool, truncateLen int) (ircmsg Message, err error) {
 	maxTagDataLength := MaxlenTagData
 	if fromClient {
 		maxTagDataLength = MaxlenClientTagData
@@ -162,25 +175,26 @@ func ParseLineStrict(line string, fromClient bool, truncateLen int) (ircmsg IRCM
 // slice off any amount of ' ' from the front of the string
 func trimInitialSpaces(str string) string {
 	var i int
-	for i = 0; i < len(str) && str[i] == ' '; i += 1 {
+	for i = 0; i < len(str) && str[i] == ' '; i++ {
 	}
 	return str[i:]
 }
 
-func parseLine(line string, maxTagDataLength int, truncateLen int) (ircmsg IRCMessage, err error) {
-	if strings.IndexByte(line, '\x00') != -1 {
-		err = ErrorLineContainsBadChar
-		return
+func parseLine(line string, maxTagDataLength int, truncateLen int) (ircmsg Message, err error) {
+	// remove either \n or \r\n from the end of the line:
+	line = strings.TrimSuffix(line, "\n")
+	line = strings.TrimSuffix(line, "\r")
+	// whether we removed them ourselves, or whether they were removed previously,
+	// they count against the line limit:
+	if truncateLen != 0 {
+		if truncateLen <= 2 {
+			return ircmsg, ErrorLineIsEmpty
+		}
+		truncateLen -= 2
 	}
-
-	// trim to the first appearance of either '\r' or '\n':
-	lineEnd := strings.IndexByte(line, '\r')
-	newlineIndex := strings.IndexByte(line, '\n')
-	if newlineIndex != -1 && (lineEnd == -1 || newlineIndex < lineEnd) {
-		lineEnd = newlineIndex
-	}
-	if lineEnd != -1 {
-		line = line[:lineEnd]
+	// now validate for the 3 forbidden bytes:
+	if strings.IndexByte(line, '\x00') != -1 || strings.IndexByte(line, '\n') != -1 || strings.IndexByte(line, '\r') != -1 {
+		return ircmsg, ErrorLineContainsBadChar
 	}
 
 	if len(line) < 1 {
@@ -195,7 +209,7 @@ func parseLine(line string, maxTagDataLength int, truncateLen int) (ircmsg IRCMe
 		}
 		tags := line[1:tagEnd]
 		if 0 < maxTagDataLength && maxTagDataLength < len(tags) {
-			return ircmsg, ErrorLineTooLong
+			return ircmsg, ErrorTagsTooLong
 		}
 		err = ircmsg.parseTags(tags)
 		if err != nil {
@@ -206,7 +220,8 @@ func parseLine(line string, maxTagDataLength int, truncateLen int) (ircmsg IRCMe
 	}
 
 	// truncate if desired
-	if 0 < truncateLen && truncateLen < len(line) {
+	if truncateLen != 0 && truncateLen < len(line) {
+		err = ErrorBodyTooLong
 		line = line[:truncateLen]
 	}
 
@@ -260,11 +275,11 @@ func parseLine(line string, maxTagDataLength int, truncateLen int) (ircmsg IRCMe
 		line = line[paramEnd+1:]
 	}
 
-	return ircmsg, nil
+	return ircmsg, err
 }
 
 // helper to parse tags
-func (ircmsg *IRCMessage) parseTags(tags string) (err error) {
+func (ircmsg *Message) parseTags(tags string) (err error) {
 	for 0 < len(tags) {
 		tagEnd := strings.IndexByte(tags, ';')
 		endPos := tagEnd
@@ -285,8 +300,7 @@ func (ircmsg *IRCMessage) parseTags(tags string) (err error) {
 		// "Implementations [...] MUST NOT perform any validation that would
 		//  reject the message if an invalid tag key name is used."
 		if validateTagName(tagName) {
-			// "Tag values MUST be encoded as UTF8."
-			if !utf8.ValidString(tagValue) {
+			if !validateTagValue(tagValue) {
 				return ErrorInvalidTagContent
 			}
 			ircmsg.SetTag(tagName, UnescapeTagValue(tagValue))
@@ -297,8 +311,8 @@ func (ircmsg *IRCMessage) parseTags(tags string) (err error) {
 	return nil
 }
 
-// MakeMessage provides a simple way to create a new IRCMessage.
-func MakeMessage(tags map[string]string, prefix string, command string, params ...string) (ircmsg IRCMessage) {
+// MakeMessage provides a simple way to create a new Message.
+func MakeMessage(tags map[string]string, prefix string, command string, params ...string) (ircmsg Message) {
 	ircmsg.Prefix = prefix
 	ircmsg.Command = command
 	ircmsg.Params = params
@@ -306,8 +320,8 @@ func MakeMessage(tags map[string]string, prefix string, command string, params .
 	return ircmsg
 }
 
-// Line returns a sendable line created from an IRCMessage.
-func (ircmsg *IRCMessage) Line() (result string, err error) {
+// Line returns a sendable line created from an Message.
+func (ircmsg *Message) Line() (result string, err error) {
 	bytes, err := ircmsg.line(0, 0, 0, 0)
 	if err == nil {
 		result = string(bytes)
@@ -315,17 +329,17 @@ func (ircmsg *IRCMessage) Line() (result string, err error) {
 	return
 }
 
-// LineBytes returns a sendable line created from an IRCMessage.
-func (ircmsg *IRCMessage) LineBytes() (result []byte, err error) {
+// LineBytes returns a sendable line created from an Message.
+func (ircmsg *Message) LineBytes() (result []byte, err error) {
 	result, err = ircmsg.line(0, 0, 0, 0)
 	return
 }
 
-// LineBytesStrict returns a sendable line, as a []byte, created from an IRCMessage.
+// LineBytesStrict returns a sendable line, as a []byte, created from an Message.
 // fromClient controls whether the server-side or client-side tag length limit
 // is enforced. If truncateLen is nonzero, it is the length at which the
 // non-tag portion of the message is truncated.
-func (ircmsg *IRCMessage) LineBytesStrict(fromClient bool, truncateLen int) ([]byte, error) {
+func (ircmsg *Message) LineBytesStrict(fromClient bool, truncateLen int) ([]byte, error) {
 	var tagLimit, clientOnlyTagDataLimit, serverAddedTagDataLimit int
 	if fromClient {
 		// enforce client max tags:
@@ -345,9 +359,9 @@ func paramRequiresTrailing(param string) bool {
 	return len(param) == 0 || strings.IndexByte(param, ' ') != -1 || param[0] == ':'
 }
 
-// line returns a sendable line created from an IRCMessage.
-func (ircmsg *IRCMessage) line(tagLimit, clientOnlyTagDataLimit, serverAddedTagDataLimit, truncateLen int) ([]byte, error) {
-	if len(ircmsg.Command) < 1 {
+// line returns a sendable line created from an Message.
+func (ircmsg *Message) line(tagLimit, clientOnlyTagDataLimit, serverAddedTagDataLimit, truncateLen int) (result []byte, err error) {
+	if len(ircmsg.Command) == 0 {
 		return nil, ErrorCommandMissing
 	}
 
@@ -356,10 +370,14 @@ func (ircmsg *IRCMessage) line(tagLimit, clientOnlyTagDataLimit, serverAddedTagD
 	// write the tags, computing the budgets for client-only tags and regular tags
 	var lenRegularTags, lenClientOnlyTags, lenTags int
 	if 0 < len(ircmsg.tags) || 0 < len(ircmsg.clientOnlyTags) {
+		var tagError error
 		buf.WriteByte('@')
 		firstTag := true
 		writeTags := func(tags map[string]string) {
 			for tag, val := range tags {
+				if !(validateTagName(tag) && validateTagValue(val)) {
+					tagError = ErrorInvalidTagContent
+				}
 				if !firstTag {
 					buf.WriteByte(';') // delimiter
 				}
@@ -380,14 +398,17 @@ func (ircmsg *IRCMessage) line(tagLimit, clientOnlyTagDataLimit, serverAddedTagD
 			lenClientOnlyTags -= 1
 		}
 		buf.WriteByte(' ')
+		if tagError != nil {
+			return nil, tagError
+		}
 	}
 	lenTags = buf.Len()
 
 	if 0 < tagLimit && tagLimit < buf.Len() {
-		return nil, ErrorLineTooLong
+		return nil, ErrorTagsTooLong
 	}
 	if (0 < clientOnlyTagDataLimit && clientOnlyTagDataLimit < lenClientOnlyTags) || (0 < serverAddedTagDataLimit && serverAddedTagDataLimit < lenRegularTags) {
-		return nil, ErrorLineTooLong
+		return nil, ErrorTagsTooLong
 	}
 
 	if len(ircmsg.Prefix) > 0 {
@@ -410,17 +431,33 @@ func (ircmsg *IRCMessage) line(tagLimit, clientOnlyTagDataLimit, serverAddedTagD
 		buf.WriteString(param)
 	}
 
-	// truncate if desired
-	// -2 for \r\n
-	restLen := buf.Len() - lenTags
-	if 0 < truncateLen && (truncateLen-2) < restLen {
-		buf.Truncate(lenTags + (truncateLen - 2))
+	// truncate if desired; leave 2 bytes over for \r\n:
+	if truncateLen != 0 && (truncateLen-2) < (buf.Len()-lenTags) {
+		err = ErrorBodyTooLong
+		newBufLen := lenTags + (truncateLen - 2)
+		buf.Truncate(newBufLen)
+		// XXX: we may have truncated in the middle of a UTF8-encoded codepoint;
+		// if so, remove additional bytes, stopping when the sequence either
+		// ends in a valid codepoint, or we have removed 3 bytes (the maximum
+		// length of the remnant of a once-valid, truncated codepoint; we don't
+		// want to truncate the entire message if it wasn't UTF8 in the first
+		// place).
+		for i := 0; i < (utf8.UTFMax - 1); i++ {
+			r, n := utf8.DecodeLastRune(buf.Bytes())
+			if r == utf8.RuneError && n <= 1 {
+				newBufLen--
+				buf.Truncate(newBufLen)
+			} else {
+				break
+			}
+		}
 	}
 	buf.WriteString("\r\n")
 
-	result := buf.Bytes()
-	if bytes.IndexByte(result, '\x00') != -1 {
+	result = buf.Bytes()
+	toValidate := result[:len(result)-2]
+	if bytes.IndexByte(toValidate, '\x00') != -1 || bytes.IndexByte(toValidate, '\r') != -1 || bytes.IndexByte(toValidate, '\n') != -1 {
 		return nil, ErrorLineContainsBadChar
 	}
-	return result, nil
+	return result, err
 }

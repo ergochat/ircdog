@@ -4,7 +4,6 @@
 package main
 
 import (
-	"bufio"
 	"crypto/tls"
 	"fmt"
 	"log"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/goshuirc/irc-go/ircfmt"
 	"github.com/goshuirc/irc-go/ircmsg"
+	"github.com/goshuirc/irc-go/ircreader"
 
 	docopt "github.com/docopt/docopt-go"
 	"github.com/goshuirc/ircdog/lib"
@@ -180,14 +180,16 @@ Options:
 		}()
 
 		// read incoming lines
-		reader := bufio.NewReader(os.Stdin)
+		var reader ircreader.Reader
+		reader.Initialize(os.Stdin, lib.InitialBufferSize, lib.MaxBufferSize)
 		for {
-			line, err := reader.ReadString('\n')
+			lineBytes, err := reader.ReadLine()
 			if err != nil {
 				fmt.Println("** ircdog error: failed to read new input line:", err.Error())
 				connection.Disconnect()
 				return
 			}
+			line := string(lineBytes)
 
 			if useControlCodeReplacements {
 				line = lib.ReplaceControlCodes(line)

@@ -4,13 +4,19 @@
 package lib
 
 import (
-	"bufio"
 	"crypto/tls"
 	"errors"
 	"net"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/goshuirc/irc-go/ircreader"
+)
+
+const (
+	InitialBufferSize = 1024
+	MaxBufferSize     = 1024 * 1024
 )
 
 var (
@@ -26,10 +32,9 @@ type Socket struct {
 	connected      bool
 
 	readMutex sync.Mutex
-	reader    *bufio.Reader
+	reader    ircreader.Reader
 
 	writeMutex sync.Mutex
-	writer     *bufio.Writer
 }
 
 // ConnectSocket connects to the given host/port and starts our receivers if appropriate.
@@ -55,21 +60,20 @@ func ConnectSocket(host string, port int, useTLS bool, tlsConfig *tls.Config) (*
 	s := Socket{
 		connected:  true,
 		connection: conn,
-		reader:     bufio.NewReader(conn),
-		writer:     bufio.NewWriter(conn),
 	}
+	s.reader.Initialize(conn, InitialBufferSize, MaxBufferSize)
 
 	return &s, nil
 }
 
 // MakeSocket makes a socket from the given connection.
 func MakeSocket(conn net.Conn) *Socket {
-	return &Socket{
+	result := &Socket{
 		connected:  true,
 		connection: conn,
-		reader:     bufio.NewReader(conn),
-		writer:     bufio.NewWriter(conn),
 	}
+	result.reader.Initialize(conn, InitialBufferSize, MaxBufferSize)
+	return result
 }
 
 // GetLine returns a single IRC line from the socket.
@@ -80,7 +84,7 @@ func (s *Socket) GetLine() (string, error) {
 
 	s.readMutex.Lock()
 	defer s.readMutex.Unlock()
-	lineBytes, err := s.reader.ReadBytes('\n')
+	lineBytes, err := s.reader.ReadLine()
 
 	return strings.TrimRight(string(lineBytes), "\r\n"), err
 }
@@ -94,10 +98,10 @@ func (s *Socket) SendLine(line string) error {
 	s.writeMutex.Lock()
 	defer s.writeMutex.Unlock()
 
-	_, err := s.writer.WriteString(line + "\r\n")
-	if err == nil {
-		err = s.writer.Flush()
-	}
+	out := make([]byte, len(line)+2)
+	copy(out, line[:])
+	copy(out[len(line):], "\r\n")
+	_, err := s.connection.Write(out)
 	return err
 }
 

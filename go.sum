@@ -2,9 +2,8 @@ github.com/DanielOaks/go-idn v0.0.0-20160120021903-76db0e10dc65/go.mod h1:GYIaL2
 github.com/docopt/docopt-go v0.0.0-20160216232012-784ddc588536 h1:rHnpq7uNlix5l7tWZ55iJcHHrxCPnOVF4FGb7qOT2Jc=
 github.com/docopt/docopt-go v0.0.0-20160216232012-784ddc588536/go.mod h1:WwZ+bS3ebgob9U8Nd0kOddGdZWjyMGR8Wziv+TBNwSE=
 github.com/goshuirc/eventmgr v0.0.0-20170615162049-060479027c93/go.mod h1:bjJFM4iZJWTf9Rka9sNuI3GxszJqFeu5r1r15ZVtemo=
-github.com/goshuirc/irc-go v0.0.0-20190713001546-05ecc95249a0/go.mod h1:rhIkxdehxNqK9iwJXWzQnxlGuuUR4cHu7PN64VryKXk=
-github.com/goshuirc/irc-go v0.0.0-20210215162435-14cd697c0c8c h1:pOTMO5A1nszuxNyKieZa3owgDqCpN1OhOGbBg8EuLzk=
-github.com/goshuirc/irc-go v0.0.0-20210215162435-14cd697c0c8c/go.mod h1:q/JhvvKLmif3y9q8MDQM+gRCnjEKnu5ClF298TTXJug=
+github.com/goshuirc/irc-go v0.0.0-20210419135230-722fe286c959 h1:egip3/1S66BWwxMnCUmAMg2TMJhBN6cBPr4eEz5aceg=
+github.com/goshuirc/irc-go v0.0.0-20210419135230-722fe286c959/go.mod h1:q/JhvvKLmif3y9q8MDQM+gRCnjEKnu5ClF298TTXJug=
 github.com/mattn/go-colorable v0.1.2 h1:/bC9yWikZXAL9uJdulbSfyVNIR3n3trXl+v8+1sx8mU=
 github.com/mattn/go-colorable v0.1.2/go.mod h1:U0ppj6V5qS13XJ6of8GYAs25YV2eR4EVcfRqFIhoBtE=
 github.com/mattn/go-isatty v0.0.8/go.mod h1:Iq45c/XA43vh69/j3iqttzPXn0bhXyGjM0Hdxcsrc5s=
