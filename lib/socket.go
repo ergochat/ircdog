@@ -11,7 +11,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/goshuirc/irc-go/ircreader"
+	"github.com/ergochat/irc-go/ircreader"
 )
 
 const (

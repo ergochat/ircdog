@@ -13,12 +13,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/goshuirc/irc-go/ircfmt"
-	"github.com/goshuirc/irc-go/ircmsg"
-	"github.com/goshuirc/irc-go/ircreader"
+	"github.com/ergochat/irc-go/ircfmt"
+	"github.com/ergochat/irc-go/ircmsg"
+	"github.com/ergochat/irc-go/ircreader"
 
 	docopt "github.com/docopt/docopt-go"
-	"github.com/goshuirc/ircdog/lib"
+	"github.com/ergochat/ircdog/lib"
 	colorable "github.com/mattn/go-colorable"
 )
 
@@ -38,9 +38,9 @@ Usage:
 	ircdog -h | --help
 	ircdog --version
 
-Goshuirc Escapes:
-	When the -r option is used, lines are displayed with the goshuirc escapes
-	rather than as real formatted lines. goshuirc uses $ as an escape character
+Escapes:
+	When the -r option is used, lines are displayed with the irc-go escapes
+	rather than as real formatted lines. irc-go uses $ as an escape character
 	along with these specific escapes:
 
 	-------------------------------
@@ -89,7 +89,7 @@ Options:
 	--no-italics        Don't use the ANSI italics code to represent italics.
 	--no-controls       Don't use the control character escapes.
 	-p --nopings        Don't automatically respond to incoming pings.
-	-r --raw-incoming   Display incoming lines with raw goshuirc escapes.
+	-r --raw-incoming   Display incoming lines with raw irc-go escapes.
 	-h --help           Show this screen.
 	--version           Show version.`
 

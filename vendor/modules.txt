@@ -1,11 +1,11 @@
 # github.com/docopt/docopt-go v0.0.0-20160216232012-784ddc588536
 ## explicit
 github.com/docopt/docopt-go
-# github.com/goshuirc/irc-go v0.0.0-20210419135230-722fe286c959
+# github.com/ergochat/irc-go v0.0.0-20210809141720-dd73c4f86237
 ## explicit
-github.com/goshuirc/irc-go/ircfmt
-github.com/goshuirc/irc-go/ircmsg
-github.com/goshuirc/irc-go/ircreader
+github.com/ergochat/irc-go/ircfmt
+github.com/ergochat/irc-go/ircmsg
+github.com/ergochat/irc-go/ircreader
 # github.com/mattn/go-colorable v0.1.2
 ## explicit
 github.com/mattn/go-colorable

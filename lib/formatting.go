@@ -6,7 +6,7 @@ package lib
 import (
 	"strings"
 
-	"github.com/goshuirc/irc-go/ircfmt"
+	"github.com/ergochat/irc-go/ircfmt"
 	"github.com/mgutz/ansi"
 )
 
