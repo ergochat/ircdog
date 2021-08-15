@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/goshuirc/irc-go/ircmsg"
+	"github.com/ergochat/irc-go/ircmsg"
 )
 
 type ConnectionConfig struct {
