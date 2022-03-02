@@ -1,7 +1,7 @@
 # github.com/docopt/docopt-go v0.0.0-20160216232012-784ddc588536
 ## explicit
 github.com/docopt/docopt-go
-# github.com/ergochat/irc-go v0.0.0-20210809141720-dd73c4f86237
+# github.com/ergochat/irc-go v0.1.0
 ## explicit
 github.com/ergochat/irc-go/ircfmt
 github.com/ergochat/irc-go/ircmsg
