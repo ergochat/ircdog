@@ -86,7 +86,7 @@ Options:
 	--tls-noverify      Don't verify the provided TLS certificates.
 	--listen=<address>  Listen on an address like ":7778", pass through traffic.
 	--hide=<messages>   Comma-separated list of commands/numerics to not print.
-	-r --raw            Don't interpret IRC control codes.
+	-r --raw            Don't interpret IRC control codes when sending or receiving lines.
 	--escape            Display incoming lines with irc-go escapes.
 	--italics           Enable ANSI italics codes (not widely supported).
 	-p --nopings        Don't automatically respond to incoming pings.
