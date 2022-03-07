@@ -39,7 +39,7 @@ Usage:
 	ircdog --version
 
 Escapes:
-	When the -r option is used, lines are displayed with the irc-go escapes
+	When the --escape option is used, lines are displayed with irc-go escapes
 	rather than as real formatted lines. irc-go uses $ as an escape character
 	along with these specific escapes:
 
@@ -79,7 +79,7 @@ Sending Escapes:
 	---------------------------------
 
 	These escapes are only enabled in standard mode (not listening mode),
-	and can be disabled with the --no-controls option.
+	and can be disabled with the --raw option.
 
 Options:
 	--tls               Connect using TLS.
