@@ -80,4 +80,7 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
+# Vim swapfiles
+*.swp
+
 # End of https://www.gitignore.io/api/windows,osx,linux,go
