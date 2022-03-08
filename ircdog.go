@@ -39,7 +39,7 @@ Usage:
 	ircdog --version
 
 Escapes:
-	When the -r option is used, lines are displayed with the irc-go escapes
+	When the --escape option is used, lines are displayed with irc-go escapes
 	rather than as real formatted lines. irc-go uses $ as an escape character
 	along with these specific escapes:
 
@@ -79,17 +79,17 @@ Sending Escapes:
 	---------------------------------
 
 	These escapes are only enabled in standard mode (not listening mode),
-	and can be disabled with the --no-controls option.
+	and can be disabled with the --raw option.
 
 Options:
 	--tls               Connect using TLS.
 	--tls-noverify      Don't verify the provided TLS certificates.
 	--listen=<address>  Listen on an address like ":7778", pass through traffic.
 	--hide=<messages>   Comma-separated list of commands/numerics to not print.
-	--no-italics        Don't use the ANSI italics code to represent italics.
-	--no-controls       Don't use the control character escapes.
+	-r --raw            Don't interpret IRC control codes when sending or receiving lines.
+	--escape            Display incoming lines with irc-go escapes.
+	--italics           Enable ANSI italics codes (not widely supported).
 	-p --nopings        Don't automatically respond to incoming pings.
-	-r --raw-incoming   Display incoming lines with raw irc-go escapes.
 	-h --help           Show this screen.
 	--version           Show version.`
 
@@ -129,11 +129,13 @@ Options:
 		}
 	}
 
-	// italics formatting code
-	useItalics := !arguments["--no-italics"].(bool)
-
-	// control code replacements
-	useControlCodeReplacements := !arguments["--no-controls"].(bool)
+	raw := arguments["--raw"].(bool)
+	escape := arguments["--escape"].(bool)
+	useItalics := arguments["--italics"].(bool)
+	if raw && (escape || useItalics) {
+		log.Fatalf("Cannot combine --raw with --escape or --italics")
+	}
+	answerPings := !arguments["--nopings"].(bool)
 
 	if arguments["--listen"] == nil {
 		// not listening, just connect as usual
@@ -147,34 +149,29 @@ Options:
 			for {
 				line, err := connection.GetLine()
 				if err != nil {
-					fmt.Println("** ircdog disconnected:", err.Error())
+					log.Println("** ircdog disconnected:", err.Error())
 					connection.Disconnect()
 					os.Exit(0)
 				}
 
-				msg, err := ircmsg.ParseLine(line)
-				if err != nil {
-					fmt.Println("** ircdog warning: this next line looks incorrect, we're not formatting it **")
-					fmt.Println(line)
+				msg, parseErr := ircmsg.ParseLine(line)
+				if parseErr == nil && hiddenCommands[msg.Command] {
 					continue
 				}
 
 				// print line
-				if !hiddenCommands[strings.ToUpper(msg.Command)] {
-					if arguments["--raw-incoming"].(bool) {
-						fmt.Println(ircfmt.Escape(line))
-					} else {
-						splitLine := lib.SplitLineIntoParts(line)
-						fmt.Fprintln(colourablestdout, lib.AnsiFormatLineParts(splitLine, useItalics))
-					}
+				if raw || parseErr != nil {
+					fmt.Println(line)
+				} else if escape {
+					fmt.Println(ircfmt.Escape(line))
+				} else {
+					splitLine := lib.SplitLineIntoParts(line)
+					fmt.Fprintln(colourablestdout, lib.AnsiFormatLineParts(splitLine, useItalics))
 				}
 
 				// respond to incoming PINGs
-				if !arguments["--nopings"].(bool) {
-					if msg.Command == "PING" {
-						connection.SendMessage(true, nil, "", "PONG", msg.Params...)
-					}
-					//TODO(dan): Respond to CTCP PING/VERSION to make sure we don't get killed by nets
+				if answerPings && msg.Command == "PING" {
+					connection.SendMessage(true, nil, "", "PONG", msg.Params...)
 				}
 			}
 		}()
@@ -185,19 +182,19 @@ Options:
 		for {
 			lineBytes, err := reader.ReadLine()
 			if err != nil {
-				fmt.Println("** ircdog error: failed to read new input line:", err.Error())
+				log.Println("** ircdog error: failed to read new input line:", err.Error())
 				connection.Disconnect()
 				return
 			}
 			line := string(lineBytes)
 
-			if useControlCodeReplacements {
+			if !raw {
 				line = lib.ReplaceControlCodes(line)
 			}
 
 			err = connection.SendLine(strings.TrimRight(line, "\r\n"))
 			if err != nil {
-				fmt.Println("** ircdog error: failed to send line:", err.Error())
+				log.Println("** ircdog error: failed to send line:", err.Error())
 				connection.Disconnect()
 				return
 			}
@@ -240,38 +237,31 @@ Options:
 			for {
 				line, err := connection.GetLine()
 				if err != nil {
-					fmt.Println("** ircdog server disconnected:", err.Error())
+					log.Println("** ircdog server disconnected:", err.Error())
 					client.Disconnect()
 					connection.Disconnect()
 					os.Exit(0)
 				}
 
-				msg, err := ircmsg.ParseLine(line)
-				if err != nil {
-					outputMutex.Lock()
-					fmt.Println("** ircdog warning: this next line looks incorrect, we're not formatting it **")
-					fmt.Println("<- ", line)
-					outputMutex.Unlock()
+				msg, parseErr := ircmsg.ParseLine(line)
+				if parseErr == nil && hiddenCommands[msg.Command] {
 					continue
 				}
-
 				// print line
-				if !hiddenCommands[strings.ToUpper(msg.Command)] {
-					if arguments["--raw-incoming"].(bool) {
-						outputMutex.Lock()
-						fmt.Println("<- ", ircfmt.Escape(line))
-						outputMutex.Unlock()
-					} else {
-						splitLine := lib.AnsiFormatLineParts(lib.SplitLineIntoParts(line), useItalics)
-						outputMutex.Lock()
-						fmt.Fprintln(colourablestdout, "<-  "+splitLine)
-						outputMutex.Unlock()
-					}
+				outputMutex.Lock()
+				if raw || parseErr != nil {
+					fmt.Println(line)
+				} else if escape {
+					fmt.Println("<- ", ircfmt.Escape(line))
+				} else {
+					splitLine := lib.AnsiFormatLineParts(lib.SplitLineIntoParts(line), useItalics)
+					fmt.Fprintln(colourablestdout, "<-  "+splitLine)
 				}
+				outputMutex.Unlock()
 
 				err = client.SendLine(line)
 				if err != nil {
-					fmt.Println("** ircdog couldn't send line to client:", err.Error())
+					log.Println("** ircdog couldn't send line to client:", err.Error())
 					client.Disconnect()
 					connection.Disconnect()
 					os.Exit(0)
@@ -282,34 +272,28 @@ Options:
 		for {
 			line, err := client.GetLine()
 			if err != nil {
-				fmt.Println("** ircdog client disconnected:", err.Error())
+				log.Println("** ircdog client disconnected:", err.Error())
 				client.Disconnect()
 				connection.Disconnect()
 				os.Exit(0)
 			}
 
-			msg, err := ircmsg.ParseLine(line)
-			if err != nil {
-				outputMutex.Lock()
-				fmt.Println("** ircdog warning: this next line looks incorrect, we're not formatting it **")
-				fmt.Println(" ->", line)
-				outputMutex.Unlock()
+			msg, parseErr := ircmsg.ParseLine(line)
+			if parseErr == nil && hiddenCommands[msg.Command] {
 				continue
 			}
 
 			// print line
-			if !hiddenCommands[strings.ToUpper(msg.Command)] {
-				if arguments["--raw-incoming"].(bool) {
-					outputMutex.Lock()
-					fmt.Println(" ->", ircfmt.Escape(line))
-					outputMutex.Unlock()
-				} else {
-					outputMutex.Lock()
-					splitLine := lib.AnsiFormatLineParts(lib.SplitLineIntoParts(line), useItalics)
-					fmt.Fprintln(colourablestdout, " -> "+splitLine)
-					outputMutex.Unlock()
-				}
+			outputMutex.Lock()
+			if raw || parseErr != nil {
+				fmt.Println(" ->", line)
+			} else if escape {
+				fmt.Println(" ->", ircfmt.Escape(line))
+			} else {
+				splitLine := lib.AnsiFormatLineParts(lib.SplitLineIntoParts(line), useItalics)
+				fmt.Fprintln(colourablestdout, " -> "+splitLine)
 			}
+			outputMutex.Unlock()
 
 			err = connection.SendLine(line)
 			if err != nil {
