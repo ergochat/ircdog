@@ -1,55 +1,23 @@
-# makefile taken from Oragono's one made up by https://github.com/enckse - thanks Sean!
-BUILD=./build
-WIN=$(BUILD)/win
-LINUX=$(BUILD)/linux
-OSX=$(BUILD)/osx
-ARM6=$(BUILD)/arm
-SOURCE=ircdog.go
-VERS=XXX
+.PHONY: all build install release test gofmt
 
-.PHONY: all clean windows osx linux arm6
+GIT_COMMIT := $(shell git rev-parse HEAD 2> /dev/null)
+GIT_TAG := $(shell git tag --points-at HEAD 2> /dev/null | head -n 1)
 
-add-files = mkdir -p $1; \
-	cp LICENSE $1; \
-	cp ./docs/README $1; \
-	mkdir -p $1/docs; \
-	cp ./CHANGELOG.md $1/docs/; \
-	# cp ./docs/*.md $1/docs/; \
-	# cp ./docs/logo* $1/docs/;
+all: build
 
-all: clean windows osx linux arm6
+build:
+	go build -v -ldflags "-X main.commit=$(GIT_COMMIT) -X main.version=$(GIT_TAG)"
 
-clean:
-	rm -rf $(BUILD)
-	mkdir -p $(BUILD)
+install:
+	go install -v -ldflags "-X main.commit=$(GIT_COMMIT) -X main.version=$(GIT_TAG)"
 
-windows:
-	GOOS=windows GOARCH=amd64 go build $(SOURCE)
-	$(call add-files,$(WIN))
-	mv ircdog.exe $(WIN)
-	cd $(WIN) && zip -r ../ircdog-$(VERS)-windows.zip *
-
-osx:
-	GOOS=darwin GOARCH=amd64 go build $(SOURCE)
-	$(call add-files,$(OSX))
-	mv ircdog $(OSX)
-	cd $(OSX) && tar -czvf ../ircdog-$(VERS)-osx.tgz *
-
-linux:
-	GOOS=linux GOARCH=amd64 go build $(SOURCE)
-	$(call add-files,$(LINUX))
-	mv ircdog $(LINUX)
-	cd $(LINUX) && tar -czvf ../ircdog-$(VERS)-linux.tgz *
-
-arm6:
-	GOARM=6 GOARCH=arm go build $(SOURCE)
-	$(call add-files,$(ARM6))
-	mv ircdog $(ARM6)
-	cd $(ARM6) && tar -czvf ../ircdog-$(VERS)-arm.tgz *
-
-deps:
-	go get -v -d
+release:
+	goreleaser --skip-publish --rm-dist
 
 test:
-	cd lib && go test .
-	cd lib && go vet .
+	cd lib && go test . && go vet .
+	go vet ircdog.go
+	./.check-gofmt.sh
+
+gofmt:
+	./.check-gofmt.sh --fix

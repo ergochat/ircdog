@@ -22,6 +22,11 @@ import (
 	colorable "github.com/mattn/go-colorable"
 )
 
+// set via linker flags, either by make or by goreleaser:
+// TODO these are not used yet (we're just using lib.SemVer)
+var commit = ""  // git hash
+var version = "" // tagged version
+
 func main() {
 	version := lib.SemVer
 	usage := `ircdog.
