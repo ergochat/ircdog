@@ -3,6 +3,12 @@ All notable changes to ircdog will be documented in this file.
 
 This project adheres to [Semantic Versioning](http://semver.org/). For the purposes of versioning, we consider the "public API" to refer to the configuration files and CLI.
 
+## [0.3.0] - 2022-03-18
+ircdog v0.3.0 is a new release with a few bug fixes:
+
+* Upgrade [irc-go](https://github.com/ergochat/irc-go) to latest, fixing various correctness and performance issues
+* Simplify switches; add `--raw` for raw I/O (i.e. control codes are not interpreted), `--tls-noverify` now entails `--tls` (#22)
+* Support outgoing control code escapes
 
 ## [0.2.1] - 2017-12-29
 Fix for a silly bug. Guess I should add some proper tests at some point!
