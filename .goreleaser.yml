@@ -3,6 +3,8 @@
 project_name: ircdog
 builds:
   - main: ircdog.go
+    env:
+      - CGO_ENABLED=0
     binary: ircdog
     goos:
       - linux
