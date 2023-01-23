@@ -6,6 +6,9 @@ github.com/docopt/docopt-go
 github.com/ergochat/irc-go/ircfmt
 github.com/ergochat/irc-go/ircmsg
 github.com/ergochat/irc-go/ircreader
+# github.com/gorilla/websocket v1.5.0
+## explicit
+github.com/gorilla/websocket
 # github.com/mattn/go-colorable v0.1.2
 ## explicit
 github.com/mattn/go-colorable

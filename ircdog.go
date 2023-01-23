@@ -39,7 +39,7 @@ to them) and see formatting characters (such as bold, colors and italics) on
 incoming lines.
 
 Usage:
-	ircdog <host> <port> [options]
+	ircdog <host> [<port>] [options]
 	ircdog -h | --help
 	ircdog --version
 
@@ -91,6 +91,7 @@ Options:
 	--tls-noverify      Don't verify the provided TLS certificates.
 	--listen=<address>  Listen on an address like ":7778", pass through traffic.
 	--hide=<messages>   Comma-separated list of commands/numerics to not print.
+	--origin=<url>      URL to send as the Origin header for a WebSocket connection
 	-r --raw            Don't interpret IRC control codes when sending or receiving lines.
 	--escape            Display incoming lines with irc-go escapes.
 	--italics           Enable ANSI italics codes (not widely supported).
@@ -101,17 +102,37 @@ Options:
 	arguments, _ := docopt.Parse(usage, nil, true, version, false)
 
 	host := arguments["<host>"].(string)
-	portstring := arguments["<port>"].(string)
-	port, err := strconv.Atoi(portstring)
-	if err != nil || port < 1 || 65535 < port {
-		log.Fatalln("Port must be a number 1-65535")
+
+	tlsNoverify := arguments["--tls-noverify"].(bool)
+	isTLS := arguments["--tls"].(bool) || tlsNoverify
+
+	var port int
+	var err error
+	portstring := arguments["<port>"]
+	if portstring == nil {
+		if isTLS {
+			port = 6697
+		} else {
+			port = 6667
+		}
+	} else {
+		port, err = strconv.Atoi(portstring.(string))
+		if err != nil || port < 1 || 65535 < port {
+			log.Fatalln("Port must be a number 1-65535")
+		}
+	}
+
+	var origin string
+	if originString := arguments["--origin"]; originString != nil {
+		origin = originString.(string)
 	}
 
 	// create config
 	connectionConfig := lib.ConnectionConfig{
-		Host: host,
-		Port: port,
-		TLS:  arguments["--tls"].(bool) || arguments["--tls-noverify"].(bool),
+		Host:   host,
+		Port:   port,
+		TLS:    isTLS,
+		Origin: origin,
 	}
 	if arguments["--tls-noverify"].(bool) {
 		connectionConfig.TLSConfig = &tls.Config{
@@ -145,7 +166,7 @@ Options:
 	if arguments["--listen"] == nil {
 		// not listening, just connect as usual
 		// create new connection
-		connection, err := lib.NewConnection(connectionConfig, &hiddenCommands)
+		connection, err := lib.NewConnection(connectionConfig, hiddenCommands)
 		if err != nil {
 			log.Fatalf("Could not create new connection: %s\n", err.Error())
 		}
@@ -232,7 +253,7 @@ Options:
 		client := lib.MakeSocket(clientConn)
 
 		// create new server connection
-		connection, err := lib.NewConnection(connectionConfig, &hiddenCommands)
+		connection, err := lib.NewConnection(connectionConfig, hiddenCommands)
 		if err != nil {
 			log.Fatalf("Could not create new connection: %s\n", err.Error())
 		}

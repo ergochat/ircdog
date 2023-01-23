@@ -5,8 +5,8 @@ package lib
 
 import (
 	"crypto/tls"
-	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/ergochat/irc-go/ircmsg"
@@ -17,23 +17,35 @@ type ConnectionConfig struct {
 	Port      int
 	TLS       bool
 	TLSConfig *tls.Config
+	Origin    string
 }
 
 type Connection struct {
 	config         ConnectionConfig
-	socket         *Socket
-	hiddenCommands *map[string]bool
+	socket         IRCSocket
+	hiddenCommands map[string]bool
 }
 
 // NewConnection returns a new Connection.
-func NewConnection(config ConnectionConfig, hiddenCommands *map[string]bool) (*Connection, error) {
-	if config.Port < 1 || 65535 < config.Port {
-		return nil, errors.New("Port must be a number 1-65535")
+func NewConnection(config ConnectionConfig, hiddenCommands map[string]bool) (*Connection, error) {
+	var socket IRCSocket
+	var err error
+
+	isWebsocket := false
+	if u, uErr := url.Parse(config.Host); uErr == nil && (u.Scheme == "ws" || u.Scheme == "wss") {
+		isWebsocket = true
 	}
 
-	socket, err := ConnectSocket(config.Host, config.Port, config.TLS, config.TLSConfig)
-	if err != nil {
-		return nil, err
+	if !isWebsocket {
+		socket, err = ConnectSocket(config.Host, config.Port, config.TLS, config.TLSConfig)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		socket, err = NewIRCWebSocket(config.Host, config.Origin, config.TLSConfig)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &Connection{
@@ -44,8 +56,8 @@ func NewConnection(config ConnectionConfig, hiddenCommands *map[string]bool) (*C
 }
 
 // GetLine returns a single line from our socket.
-func (conn *Connection) GetLine() (string, error) {
-	line, err := conn.socket.GetLine()
+func (conn *Connection) GetLine() (line string, err error) {
+	line, err = conn.socket.GetLine()
 
 	//TODO(dan): post-process line for colours, etc
 
@@ -60,8 +72,9 @@ func (conn *Connection) SendMessage(print bool, tags map[string]string, prefix s
 		return err
 	}
 
+	// TODO reevaluate this
 	line = strings.TrimRight(line, "\r\n")
-	if print && !(*conn.hiddenCommands)[strings.ToUpper(command)] {
+	if print && !conn.hiddenCommands[strings.ToUpper(command)] {
 		fmt.Println(line)
 	}
 	conn.socket.SendLine(line)
