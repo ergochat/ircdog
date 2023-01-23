@@ -81,6 +81,7 @@ Sending Escapes:
 	 Strikethrough | [[S]]    | 0x1e
 	 Underscore    | [[U]]    | 0x1f
 	 Reset         | [[R]]    | 0x0f
+	 C hex escape  | [[\x??]] | 0x??
 	---------------------------------
 
 	These escapes are only enabled in standard mode (not listening mode),
