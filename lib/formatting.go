@@ -89,7 +89,7 @@ func writeChunkAsAnsi(buf *bytes.Buffer, chunk ircfmt.FormattedSubstring, colorL
 		buf.WriteString(ansiBold)
 		truncate = true
 	}
-	if chunk.Underlined {
+	if chunk.Underline {
 		buf.WriteString(ansiUnderline)
 		truncate = true
 	}
