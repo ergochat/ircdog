@@ -219,6 +219,18 @@ func connectExternal(
 			}
 
 			msg, parseErr := ircmsg.ParseLine(line)
+
+			// respond to incoming PINGs
+			if parseErr == nil && answerPings && msg.Command == "PING" && len(msg.Params) != 0 {
+				pongMsg := ircmsg.MakeMessage(nil, "", "PONG", msg.Params[len(msg.Params)-1])
+				pong, _ := pongMsg.Line()
+				pong = pong[:len(pong)-2] // trim \r\n
+				if !hiddenCommands["PONG"] {
+					fmt.Println(pong)
+				}
+				connection.SendLine(pong)
+			}
+
 			if parseErr == nil && hiddenCommands[msg.Command] {
 				continue
 			}
@@ -230,17 +242,6 @@ func connectExternal(
 				fmt.Println(ircfmt.Escape(line))
 			} else {
 				fmt.Fprintln(os.Stdout, lib.IRCLineToAnsi(line, colorLevel, useItalics))
-			}
-
-			// respond to incoming PINGs
-			if answerPings && msg.Command == "PING" && len(msg.Params) != 0 {
-				pongMsg := ircmsg.MakeMessage(nil, "", "PONG", msg.Params[len(msg.Params)-1])
-				pong, _ := pongMsg.Line()
-				pong = pong[:len(pong)-2] // trim \r\n
-				if !hiddenCommands["PONG"] {
-					fmt.Println(pong)
-				}
-				connection.SendLine(pong)
 			}
 		}
 	}()
