@@ -12,14 +12,16 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
+
+	docopt "github.com/docopt/docopt-go"
+	supportscolor "github.com/jwalton/go-supportscolor"
 
 	"github.com/ergochat/irc-go/ircfmt"
 	"github.com/ergochat/irc-go/ircmsg"
 	"github.com/ergochat/irc-go/ircreader"
 
-	docopt "github.com/docopt/docopt-go"
 	"github.com/ergochat/ircdog/lib"
-	colorable "github.com/mattn/go-colorable"
 )
 
 // set via linker flags, either by make or by goreleaser:
@@ -27,16 +29,13 @@ import (
 var commit = ""  // git hash
 var version = "" // tagged version
 
-func main() {
-	version := lib.SemVer
-	usage := `ircdog.
-ircdog is a very simple telnet-like connection helper for IRC. Essentially, you
-connect to an IRC server and send/see raw IRC protocol lines, which is very
-useful for ircd and client developers.
-
-What ircdog lets you do is ignore incoming PINGs (by automatically responding
-to them) and see formatting characters (such as bold, colors and italics) on
-incoming lines.
+const (
+	usage = `ircdog is a very simple telnet-like connection helper for IRC. It connects
+to an IRC server and allows you to send and receive raw IRC protocol lines.
+By default, ircdog will respond to incoming PING messages from the server,
+keeping your connection alive without the need for active user input. It will
+also render IRC formatting codes (such as boldface or color codes) for
+terminal display.
 
 Usage:
 	ircdog <host> [<port>] [options]
@@ -96,10 +95,14 @@ Options:
 	-r --raw            Don't interpret IRC control codes when sending or receiving lines.
 	--escape            Display incoming lines with irc-go escapes.
 	--italics           Enable ANSI italics codes (not widely supported).
+	--color=<mode>      Override detected color support ('none', '16', '256')
 	-p --nopings        Don't automatically respond to incoming pings.
 	-h --help           Show this screen.
 	--version           Show version.`
+)
 
+func main() {
+	version := lib.SemVer
 	arguments, _ := docopt.Parse(usage, nil, true, version, false)
 
 	host := arguments["<host>"].(string)
@@ -141,8 +144,6 @@ Options:
 		}
 	}
 
-	colourablestdout := colorable.NewColorableStdout()
-
 	// list of commands/numerics to not print
 	var hiddenString string
 	if arguments["--hide"] != nil {
@@ -164,143 +165,55 @@ Options:
 	}
 	answerPings := !arguments["--nopings"].(bool)
 
-	if arguments["--listen"] == nil {
-		// not listening, just connect as usual
-		// create new connection
-		connection, err := lib.NewConnection(connectionConfig, hiddenCommands)
-		if err != nil {
-			log.Fatalf("Could not create new connection: %s\n", err.Error())
+	// call this unconditionally for its side effects
+	// (it does something to Windows terminals to make them ANSI-compliant)
+	colorSupportResult := supportscolor.SupportsColor(os.Stdout.Fd(), supportscolor.SniffFlagsOption(false))
+	colorLevel := lib.ColorLevel(colorSupportResult.Level)
+	// now handle the override arg:
+	if colorArg := arguments["--color"]; colorArg != nil {
+		switch strings.ToLower(colorArg.(string)) {
+		case "no", "none", "off", "false":
+			colorLevel = lib.ColorLevelNone
+		case "basic", "16", "ansi":
+			colorLevel = lib.ColorLevelBasic
+		case "256", "ansi256", "256color":
+			colorLevel = lib.ColorLevelAnsi256
+		case "16m", "ansi16m", "truecolor":
+			// in practice this is treated the same as ColorLevelAnsi256
+			colorLevel = lib.ColorLevelAnsi16m
+		case "on", "yes":
+			if colorLevel < lib.ColorLevelBasic {
+				colorLevel = lib.ColorLevelBasic
+			}
+		case "default":
+			// ok
+		default:
+			log.Fatalf("Invalid --color argument: `%s`", colorArg.(string))
 		}
+	}
 
-		go func() {
-			for {
-				line, err := connection.GetLine()
-				if err != nil {
-					log.Println("** ircdog disconnected:", err.Error())
-					connection.Disconnect()
-					os.Exit(0)
-				}
-
-				msg, parseErr := ircmsg.ParseLine(line)
-				if parseErr == nil && hiddenCommands[msg.Command] {
-					continue
-				}
-
-				// print line
-				if raw || parseErr != nil {
-					fmt.Println(line)
-				} else if escape {
-					fmt.Println(ircfmt.Escape(line))
-				} else {
-					splitLine := lib.SplitLineIntoParts(line)
-					fmt.Fprintln(colourablestdout, lib.AnsiFormatLineParts(splitLine, useItalics))
-				}
-
-				// respond to incoming PINGs
-				if answerPings && msg.Command == "PING" {
-					connection.SendMessage(true, nil, "", "PONG", msg.Params...)
-				}
-			}
-		}()
-
-		// read incoming lines
-		var reader ircreader.Reader
-		reader.Initialize(os.Stdin, lib.InitialBufferSize, lib.MaxBufferSize)
-		for {
-			lineBytes, err := reader.ReadLine()
-			if err != nil {
-				log.Println("** ircdog error: failed to read new input line:", err.Error())
-				connection.Disconnect()
-				return
-			}
-			line := string(lineBytes)
-
-			if !raw {
-				line = lib.ReplaceControlCodes(line)
-			}
-
-			err = connection.SendLine(strings.TrimRight(line, "\r\n"))
-			if err != nil {
-				log.Println("** ircdog error: failed to send line:", err.Error())
-				connection.Disconnect()
-				return
-			}
-		}
-
+	if listenAddr := arguments["--listen"]; listenAddr == nil {
+		connectExternal(connectionConfig, hiddenCommands, raw, escape, answerPings, useItalics, colorLevel)
 	} else {
-		// doing the listening dance, yay
-		// use a mutext to make sure client and server don't talk over each other
-		var outputMutex sync.Mutex
+		listenAndConnectExternal(listenAddr.(string), connectionConfig, hiddenCommands, raw, escape, useItalics, colorLevel)
+	}
+}
 
-		listenAddress := arguments["--listen"].(string)
+func connectExternal(
+	connectionConfig lib.ConnectionConfig,
+	hiddenCommands map[string]bool,
+	raw, escape, answerPings, useItalics bool, colorLevel lib.ColorLevel) {
 
-		ln, err := net.Listen("tcp", listenAddress)
-		if err != nil {
-			fmt.Println("** ircdog could not open listener:", err.Error())
-			fmt.Println("Listener should have the form [host]:<port> like localhost:6667 or :8889")
-			os.Exit(1)
-		}
+	connection, err := lib.NewConnection(connectionConfig)
+	if err != nil {
+		log.Fatalf("Could not create new connection: %s\n", err.Error())
+	}
 
-		fmt.Println("** ircdog listening on", listenAddress)
-		fmt.Println("** ircdog will connect once we have a client connected on the listening port")
-
-		// make the client connection
-		clientConn, err := ln.Accept()
-		if err != nil {
-			fmt.Println("** ircdog could not accept incoming connection from listener:", err.Error())
-			os.Exit(1)
-		}
-
-		client := lib.MakeSocket(clientConn)
-
-		// create new server connection
-		connection, err := lib.NewConnection(connectionConfig, hiddenCommands)
-		if err != nil {
-			log.Fatalf("Could not create new connection: %s\n", err.Error())
-		}
-
-		go func() {
-			colourablestdout := colorable.NewColorableStdout()
-			for {
-				line, err := connection.GetLine()
-				if err != nil {
-					log.Println("** ircdog server disconnected:", err.Error())
-					client.Disconnect()
-					connection.Disconnect()
-					os.Exit(0)
-				}
-
-				msg, parseErr := ircmsg.ParseLine(line)
-				if parseErr == nil && hiddenCommands[msg.Command] {
-					continue
-				}
-				// print line
-				outputMutex.Lock()
-				if raw || parseErr != nil {
-					fmt.Println(line)
-				} else if escape {
-					fmt.Println("<- ", ircfmt.Escape(line))
-				} else {
-					splitLine := lib.AnsiFormatLineParts(lib.SplitLineIntoParts(line), useItalics)
-					fmt.Fprintln(colourablestdout, "<-  "+splitLine)
-				}
-				outputMutex.Unlock()
-
-				err = client.SendLine(line)
-				if err != nil {
-					log.Println("** ircdog couldn't send line to client:", err.Error())
-					client.Disconnect()
-					connection.Disconnect()
-					os.Exit(0)
-				}
-			}
-		}()
-
+	go func() {
 		for {
-			line, err := client.GetLine()
+			line, err := connection.GetLine()
 			if err != nil {
-				log.Println("** ircdog client disconnected:", err.Error())
-				client.Disconnect()
+				log.Println("** ircdog disconnected:", err.Error())
 				connection.Disconnect()
 				os.Exit(0)
 			}
@@ -311,24 +224,181 @@ Options:
 			}
 
 			// print line
-			outputMutex.Lock()
 			if raw || parseErr != nil {
-				fmt.Println(" ->", line)
+				fmt.Println(line)
 			} else if escape {
-				fmt.Println(" ->", ircfmt.Escape(line))
+				fmt.Println(ircfmt.Escape(line))
 			} else {
-				splitLine := lib.AnsiFormatLineParts(lib.SplitLineIntoParts(line), useItalics)
-				fmt.Fprintln(colourablestdout, " -> "+splitLine)
+				fmt.Fprintln(os.Stdout, lib.IRCLineToAnsi(line, colorLevel, useItalics))
 			}
-			outputMutex.Unlock()
 
-			err = connection.SendLine(line)
-			if err != nil {
-				fmt.Println("** ircdog couldn't send line to server:", err.Error())
-				client.Disconnect()
-				connection.Disconnect()
-				os.Exit(0)
+			// respond to incoming PINGs
+			if answerPings && msg.Command == "PING" && len(msg.Params) != 0 {
+				pongMsg := ircmsg.MakeMessage(nil, "", "PONG", msg.Params[len(msg.Params)-1])
+				pong, _ := pongMsg.Line()
+				pong = pong[:len(pong)-2] // trim \r\n
+				if !hiddenCommands["PONG"] {
+					fmt.Println(pong)
+				}
+				connection.SendLine(pong)
 			}
+		}
+	}()
+
+	// read incoming lines
+	var reader ircreader.Reader
+	reader.Initialize(os.Stdin, lib.InitialBufferSize, lib.MaxBufferSize)
+	for {
+		lineBytes, err := reader.ReadLine()
+		if err != nil {
+			log.Println("** ircdog error: failed to read new input line:", err.Error())
+			connection.Disconnect()
+			return
+		}
+		line := string(lineBytes)
+
+		if !raw {
+			line = lib.ReplaceControlCodes(line)
+		}
+
+		err = connection.SendLine(strings.TrimRight(line, "\r\n"))
+		if err != nil {
+			log.Println("** ircdog error: failed to send line:", err.Error())
+			connection.Disconnect()
+			return
+		}
+	}
+}
+
+type listenConnectionManager struct {
+	ln               net.Listener
+	connectionConfig lib.ConnectionConfig
+	hiddenCommands   map[string]bool
+	raw              bool
+	escape           bool
+	useItalics       bool
+	colorLevel       lib.ColorLevel
+
+	// prevent client and server from writing to stdout concurrently
+	outputMutex sync.Mutex
+
+	// allow at most one proxied connection at once:
+	// 0 means no active connection, otherwise the unique ID of a connection
+	activeConnection atomic.Uint64
+}
+
+func listenAndConnectExternal(
+	listenAddress string, connectionConfig lib.ConnectionConfig,
+	hiddenCommands map[string]bool,
+	raw, escape, useItalics bool, colorLevel lib.ColorLevel) {
+
+	ln, err := net.Listen("tcp", listenAddress)
+	if err != nil {
+		log.Println("** ircdog could not open listener:", err.Error())
+		log.Println("Listener should have the form [host]:<port> like localhost:6667 or :8889")
+		os.Exit(1)
+	}
+
+	log.Printf("** ircdog listening on %s, waiting for client connection", listenAddress)
+
+	manager := listenConnectionManager{
+		ln:               ln,
+		connectionConfig: connectionConfig,
+		hiddenCommands:   hiddenCommands,
+		raw:              raw,
+		escape:           escape,
+		useItalics:       useItalics,
+		colorLevel:       colorLevel,
+	}
+	manager.acceptLoop()
+}
+
+func (m *listenConnectionManager) acceptLoop() {
+	var connectionCounter uint64
+	for {
+		clientConn, err := m.ln.Accept()
+		if err != nil {
+			log.Fatalf("** ircdog could not accept incoming connection from listener: %v", err)
+		}
+		connectionCounter++
+		connectionID := connectionCounter
+		if m.activeConnection.CompareAndSwap(0, connectionID) {
+			log.Printf("** ircdog accepted connection from %s, connecting to remote", clientConn.RemoteAddr().String())
+			// create new server connection
+			server, err := lib.NewConnection(m.connectionConfig)
+			if err != nil {
+				log.Printf("** ircdog could not create new connection: %s\n", err.Error())
+				clientConn.Write([]byte("ERROR :ircdog could not connect to remote server\r\n"))
+				clientConn.Close()
+				m.activeConnection.CompareAndSwap(connectionID, 0)
+			}
+			log.Printf("** ircdog connected to remote at %s", server.RemoteAddr().String())
+			client := lib.MakeSocket(clientConn)
+			go m.relay(connectionID, client, server, true)
+			go m.relay(connectionID, server, client, false)
+		} else {
+			clientConn.Write([]byte("ERROR :ircdog already has an active connection\r\n"))
+			clientConn.Close()
+		}
+	}
+}
+
+const (
+	// printable indicators for whether the captured line is going from client to server,
+	// or vice versa. note that markers are not shown at all in --raw mode:
+	c2sMarkerPlain = " -> "
+	s2cMarkerPlain = " <- "
+	c2sMarkerColor = "\x1b[31;100m -> \x1b[0m"
+	s2cMarkerColor = "\x1b[32;100m <- \x1b[0m"
+)
+
+func (m *listenConnectionManager) relay(connectionID uint64, input, output lib.IRCSocket, inputIsClient bool) {
+	defer func() {
+		input.Disconnect()
+		output.Disconnect()
+		m.activeConnection.CompareAndSwap(connectionID, 0)
+	}()
+
+	var inputName, outputName, marker string
+	if inputIsClient {
+		inputName, outputName, marker = "client", "server", c2sMarkerColor
+		if m.escape || m.colorLevel == lib.ColorLevelNone {
+			marker = c2sMarkerPlain
+		}
+	} else {
+		inputName, outputName, marker = "server", "client", s2cMarkerColor
+		if m.escape || m.colorLevel == lib.ColorLevelNone {
+			marker = s2cMarkerPlain
+		}
+	}
+
+	for {
+		line, err := input.GetLine()
+		if err != nil {
+			log.Printf("** ircdog %s disconnected: %v", inputName, err.Error())
+			return
+		}
+
+		msg, parseErr := ircmsg.ParseLine(line)
+		if parseErr == nil && m.hiddenCommands[msg.Command] {
+			continue
+		}
+		// print line
+		m.outputMutex.Lock()
+		if m.raw {
+			fmt.Println(line)
+		} else if m.escape {
+			fmt.Printf("%s%s\n", marker, ircfmt.Escape(line))
+		} else {
+			splitLine := lib.IRCLineToAnsi(line, m.colorLevel, m.useItalics)
+			fmt.Printf("%s%s\n", marker, splitLine)
+		}
+		m.outputMutex.Unlock()
+
+		err = output.SendLine(line)
+		if err != nil {
+			log.Printf("** ircdog couldn't send line to %s: %v", outputName, err)
+			return
 		}
 	}
 }

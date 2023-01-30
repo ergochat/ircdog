@@ -5,6 +5,7 @@ package lib
 import (
 	"crypto/tls"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"sync"
@@ -70,4 +71,8 @@ func (w *IRCWebSocket) Disconnect() {
 
 func (w *IRCWebSocket) realDisconnect() {
 	w.websocket.Close()
+}
+
+func (w *IRCWebSocket) RemoteAddr() net.Addr {
+	return w.websocket.RemoteAddr()
 }
