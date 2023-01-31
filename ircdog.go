@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -42,32 +43,9 @@ Usage:
 	ircdog -h | --help
 	ircdog --version
 
-Escapes:
-	When the --escape option is used, lines are displayed with irc-go escapes
-	rather than as real formatted lines. irc-go uses $ as an escape character
-	along with these specific escapes:
-
-	-------------------------------
-	 Name          | Escape | Raw
-	-------------------------------
-	 Dollarsign    |   $$   |  $
-	 Bold          |   $b   | 0x02
-	 Colour        |   $c   | 0x03
-	 Monospace     |   $m   | 0x11
-	 Italic        |   $i   | 0x1d
-	 Strikethrough |   $s   | 0x1e
-	 Underscore    |   $u   | 0x1f
-	 Reset         |   $r   | 0x0f
-	-------------------------------
-
-	Colours are followed by the specific colour code(s) in square brackets. For
-	example, "$c[red,blue]" means red foreground, blue background. If there are
-	no colour codes following, a pair of empty brackets like "$c[]" is used.
-
 Sending Escapes:
-	To send special characters like colour codes and CTCP messages, ircdog
-	supports a few escape characters that get converted before messages are
-	sent. These escapes are case-sensitive:
+	ircdog supports escape sequences in its input (use --raw to disable this).
+	The following are case-sensitive:
 
 	---------------------------------
 	 Name          | Escape   | Raw
@@ -83,9 +61,6 @@ Sending Escapes:
 	 C hex escape  | [[\x??]] | 0x??
 	---------------------------------
 
-	These escapes are only enabled in standard mode (not listening mode),
-	and can be disabled with the --raw option.
-
 Options:
 	--tls               Connect using TLS.
 	--tls-noverify      Don't verify the provided TLS certificates.
@@ -93,7 +68,8 @@ Options:
 	--hide=<messages>   Comma-separated list of commands/numerics to not print.
 	--origin=<url>      URL to send as the Origin header for a WebSocket connection
 	-r --raw            Don't interpret IRC control codes when sending or receiving lines.
-	--escape            Display incoming lines with irc-go escapes.
+	--escape            Display incoming lines with irc-go escapes:
+	                    https://pkg.go.dev/github.com/goshuirc/irc-go/ircfmt
 	--italics           Enable ANSI italics codes (not widely supported).
 	--color=<mode>      Override detected color support ('none', '16', '256')
 	-p --nopings        Don't automatically respond to incoming pings.
@@ -101,47 +77,96 @@ Options:
 	--version           Show version.`
 )
 
+func parsePort(portStr string) (port int, err error) {
+	if port, pErr := strconv.Atoi(portStr); pErr == nil && 1 <= port && port <= 65535 {
+		return port, nil
+	} else {
+		return 0, fmt.Errorf("Invalid port number `%s`", portStr)
+	}
+}
+
+func parseConnectionConfig(arguments map[string]any) (config lib.ConnectionConfig, err error) {
+	tlsNoverify := arguments["--tls-noverify"].(bool)
+	config.TLS = arguments["--tls"].(bool) || tlsNoverify
+
+	host := arguments["<host>"].(string)
+
+	u, uErr := url.Parse(host)
+	if uErr != nil {
+		err = fmt.Errorf("Invalid host: %w", uErr)
+		return
+	}
+	if u.Scheme == "https" {
+		u.Scheme = "wss"
+	} else if u.Scheme == "http" {
+		u.Scheme = "ws"
+	}
+
+	if u.Scheme == "" {
+		// bare hostname, not a URL
+		config.Host = strings.TrimPrefix(host, "unix:")
+		portstring := arguments["<port>"]
+		if portstring == nil {
+			if config.TLS {
+				config.Port = 6697
+			} else if !strings.HasPrefix(host, "/") {
+				err = fmt.Errorf("An explicit port number is required for plaintext (try 6667)")
+				return
+			}
+		} else {
+			config.Port, err = parsePort(portstring.(string))
+			if err != nil {
+				return
+			}
+		}
+	} else if u.Scheme == "ws" || u.Scheme == "wss" {
+		// WebsocketURL supersedes Host and Port options
+		config.WebsocketURL = host
+		if config.TLS && u.Scheme == "ws" {
+			err = fmt.Errorf("To enable TLS on a WebSocket URL, use the scheme wss://")
+			return
+		}
+	} else if u.Scheme == "irc" || u.Scheme == "ircs" {
+		// ircs:// switches TLS on, but so should --tls with an irc:// URL
+		if u.Scheme == "ircs" {
+			config.TLS = true
+		}
+		if hostStr, portStr, splitErr := net.SplitHostPort(u.Host); splitErr == nil {
+			config.Host = hostStr
+			config.Port, err = parsePort(portStr)
+			if err != nil {
+				return
+			}
+		} else {
+			config.Host = u.Host
+			// no port in URL, use the protocol default
+			if config.TLS {
+				config.Port = 6697
+			} else {
+				config.Port = 6667
+			}
+		}
+	}
+
+	if originString := arguments["--origin"]; originString != nil {
+		config.Origin = originString.(string)
+	}
+
+	if tlsNoverify {
+		config.TLSConfig = &tls.Config{
+			InsecureSkipVerify: true,
+		}
+	}
+	return
+}
+
 func main() {
 	version := lib.SemVer
 	arguments, _ := docopt.Parse(usage, nil, true, version, false)
 
-	host := arguments["<host>"].(string)
-
-	tlsNoverify := arguments["--tls-noverify"].(bool)
-	isTLS := arguments["--tls"].(bool) || tlsNoverify
-
-	var port int
-	var err error
-	portstring := arguments["<port>"]
-	if portstring == nil {
-		if isTLS {
-			port = 6697
-		} else {
-			port = 6667
-		}
-	} else {
-		port, err = strconv.Atoi(portstring.(string))
-		if err != nil || port < 1 || 65535 < port {
-			log.Fatalln("Port must be a number 1-65535")
-		}
-	}
-
-	var origin string
-	if originString := arguments["--origin"]; originString != nil {
-		origin = originString.(string)
-	}
-
-	// create config
-	connectionConfig := lib.ConnectionConfig{
-		Host:   host,
-		Port:   port,
-		TLS:    isTLS,
-		Origin: origin,
-	}
-	if arguments["--tls-noverify"].(bool) {
-		connectionConfig.TLSConfig = &tls.Config{
-			InsecureSkipVerify: true,
-		}
+	connectionConfig, err := parseConnectionConfig(arguments)
+	if err != nil {
+		log.Fatalf("Invalid arguments: %v", err)
 	}
 
 	// list of commands/numerics to not print

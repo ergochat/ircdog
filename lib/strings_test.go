@@ -59,6 +59,7 @@ var ansi16MessageTestCases = []stringTestCase{
 	{"\x1ea", "\x1b[9ma\x1b[0m"},
 	{"a \x0302blue text", "a \x1b[34mblue text\x1b[0m"},
 	{"a \x0302\x02bold blue text", "a \x1b[1;34mbold blue text\x1b[0m"},
+	{"a \x0302blue text \x02with a bold portion", "a \x1b[34mblue text \x1b[0m\x1b[1;34mwith a bold portion\x1b[0m"},
 	{"a \x0372blue text", "a blue text"},
 }
 
@@ -88,6 +89,7 @@ func TestAnsi256MessageConversion(t *testing.T) {
 
 var ansi16LineTestCases = []stringTestCase{
 	{"", ""},
+	{":", ":"},
 	{" ", " "},
 	{"  ", "  "},
 	{" x  ", " x  "},
@@ -117,6 +119,8 @@ var ansi16LineTestCases = []stringTestCase{
 		":PRIV\x02MSG\x02    \x02boldface",
 		":PRIV\x02MSG\x02    \x02boldface",
 	},
+	{"PRIVMSG #chat :\x01ACTION snorts\x01", "PRIVMSG #chat :" + ctcpMarker + "ACTION snorts" + ctcpMarker},
+	{"PRIVMSG #chat :", "PRIVMSG #chat :"},
 }
 
 func TestAnsi16LineConversions(t *testing.T) {

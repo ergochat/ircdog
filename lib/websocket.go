@@ -40,7 +40,11 @@ func NewIRCWebSocket(wsUrl, origin string, tlsConfig *tls.Config) (IRCSocket, er
 	}
 	ws, resp, err := dialer.Dial(wsUrl, headers)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %d", err, resp.StatusCode)
+		explanation := "no HTTP response"
+		if resp != nil {
+			explanation = fmt.Sprintf("HTTP status code %d", resp.StatusCode)
+		}
+		return nil, fmt.Errorf("%w (%s)", err, explanation)
 	}
 	return &IRCWebSocket{
 		websocket: ws,

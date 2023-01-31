@@ -14,7 +14,7 @@ var ircColorToAnsiForeground = [16]uint8{
 	31, // 05 brown -> red, normal intensity
 	35, // 06 magenta
 	33, // 07 orange -> yellow, normal intensity
-	93, // 08 yellow -> yellow, normal intensity
+	93, // 08 yellow -> yellow, high intensity
 	92, // 09 light green -> green, high intensity
 	36, // 10 cyan
 	96, // 11 light cyan -> cyan, high intensity
@@ -28,6 +28,9 @@ var ircColorToAnsi256 = map[uint8]uint8{
 	// overrides for the 16-color palette
 	5: 94,  // brown
 	7: 208, // orange
+	// i considered mapping red to a "true red" but not sure how that would
+	// interact with unusual remappings of the 16 colors, such as Solarized
+	// 4: 196,
 
 	// https://modern.ircdocs.horse/formatting.html#colors-16-98
 	16: 52,

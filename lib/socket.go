@@ -43,17 +43,23 @@ type Socket struct {
 
 // ConnectSocket connects to the given host/port and starts our receivers if appropriate.
 func ConnectSocket(host string, port int, useTLS bool, tlsConfig *tls.Config) (*Socket, error) {
-	// assemble address
-	address := net.JoinHostPort(host, strconv.Itoa(port))
+	var address, proto string
+	if strings.HasPrefix(host, "/") {
+		address = host
+		proto = "unix"
+	} else {
+		address = net.JoinHostPort(host, strconv.Itoa(port))
+		proto = "tcp"
+	}
 
 	// initial connections
 	var conn net.Conn
 	var err error
 
 	if useTLS {
-		conn, err = tls.Dial("tcp", address, tlsConfig)
+		conn, err = tls.Dial(proto, address, tlsConfig)
 	} else {
-		conn, err = net.Dial("tcp", address)
+		conn, err = net.Dial(proto, address)
 	}
 
 	if err != nil {

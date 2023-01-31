@@ -37,10 +37,13 @@ func IRCMessageToAnsi(message string, colorLevel ColorLevel, outputItalics bool)
 	}
 
 	chunks := ircfmt.Split(message)
-	if len(chunks) == 0 {
-		return message
-	} else if !isCTCP && len(chunks) == 1 && !chunks[0].IsFormatted() {
-		return chunks[0].Content
+	if !isCTCP {
+		// fast paths for messages with no formatting characters
+		if len(chunks) == 0 {
+			return message
+		} else if len(chunks) == 1 && !chunks[0].IsFormatted() {
+			return chunks[0].Content
+		}
 	}
 
 	var buf bytes.Buffer
