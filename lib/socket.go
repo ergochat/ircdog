@@ -28,54 +28,50 @@ type IRCSocket interface {
 	SendLine(string) error
 	GetLine() (string, error)
 	Disconnect()
+	RemoteAddr() net.Addr
 }
 
 // Socket appropriately buffers IRC lines.
 type Socket struct {
 	connection net.Conn
 
-	connectedMutex sync.Mutex
-	connected      bool
-
-	readMutex sync.Mutex
-	reader    ircreader.Reader
+	reader ircreader.Reader
 
 	writeMutex sync.Mutex
+	closeOnce  sync.Once
 }
 
 // ConnectSocket connects to the given host/port and starts our receivers if appropriate.
 func ConnectSocket(host string, port int, useTLS bool, tlsConfig *tls.Config) (*Socket, error) {
-	// assemble address
-	address := net.JoinHostPort(host, strconv.Itoa(port))
+	var address, proto string
+	if strings.HasPrefix(host, "/") {
+		address = host
+		proto = "unix"
+	} else {
+		address = net.JoinHostPort(host, strconv.Itoa(port))
+		proto = "tcp"
+	}
 
 	// initial connections
 	var conn net.Conn
 	var err error
 
 	if useTLS {
-		conn, err = tls.Dial("tcp", address, tlsConfig)
+		conn, err = tls.Dial(proto, address, tlsConfig)
 	} else {
-		conn, err = net.Dial("tcp", address)
+		conn, err = net.Dial(proto, address)
 	}
 
 	if err != nil {
 		return nil, err
 	}
 
-	// set socket details
-	s := Socket{
-		connected:  true,
-		connection: conn,
-	}
-	s.reader.Initialize(conn, InitialBufferSize, MaxBufferSize)
-
-	return &s, nil
+	return MakeSocket(conn), nil
 }
 
 // MakeSocket makes a socket from the given connection.
 func MakeSocket(conn net.Conn) *Socket {
 	result := &Socket{
-		connected:  true,
 		connection: conn,
 	}
 	result.reader.Initialize(conn, InitialBufferSize, MaxBufferSize)
@@ -84,48 +80,31 @@ func MakeSocket(conn net.Conn) *Socket {
 
 // GetLine returns a single IRC line from the socket.
 func (s *Socket) GetLine() (string, error) {
-	if !s.Connected() {
-		return "", ErrorDisconnected
-	}
-
-	s.readMutex.Lock()
-	defer s.readMutex.Unlock()
 	lineBytes, err := s.reader.ReadLine()
-
 	return strings.TrimRight(string(lineBytes), "\r\n"), err
 }
 
 // SendLine sends a single IRC line to the socket
 func (s *Socket) SendLine(line string) error {
-	if !s.Connected() {
-		return ErrorDisconnected
-	}
-
-	s.writeMutex.Lock()
-	defer s.writeMutex.Unlock()
-
 	out := make([]byte, len(line)+2)
 	copy(out, line[:])
 	copy(out[len(line):], "\r\n")
+
+	s.writeMutex.Lock()
+	defer s.writeMutex.Unlock()
 	_, err := s.connection.Write(out)
 	return err
 }
 
 // Disconnect severs our connection to the server.
 func (s *Socket) Disconnect() {
-	s.connectedMutex.Lock()
-	defer s.connectedMutex.Unlock()
-
-	if !s.connected {
-		s.connected = false
-		s.connection.Close()
-	}
+	s.closeOnce.Do(s.realDisconnect)
 }
 
-// Connected returns true if we're still connected
-func (s *Socket) Connected() bool {
-	s.connectedMutex.Lock()
-	defer s.connectedMutex.Unlock()
+func (s *Socket) realDisconnect() {
+	s.connection.Close()
+}
 
-	return s.connected
+func (s *Socket) RemoteAddr() net.Addr {
+	return s.connection.RemoteAddr()
 }
