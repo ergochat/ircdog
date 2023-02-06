@@ -5,6 +5,7 @@ package lib
 
 import (
 	"crypto/tls"
+	"net"
 )
 
 type ConnectionConfig struct {
@@ -19,21 +20,29 @@ type ConnectionConfig struct {
 	Origin string
 }
 
-func NewConnection(config ConnectionConfig) (IRCSocket, error) {
-	var socket IRCSocket
-	var err error
+// IRCConnection is an abstract IRC connection.
+type IRCConnection interface {
+	// SendLine sends an IRC protocol line, given without \r\n
+	SendLine(string) error
+	// GetLine reads and returns an IRC protocol line, stripping the \r\n
+	GetLine() (string, error)
+	// Disconnect closes the connection, interrupting GetLine(); it must be
+	// concurrency-safe and idempotent.
+	Disconnect()
+	RemoteAddr() net.Addr
+}
 
+func NewConnection(config ConnectionConfig) (conn IRCConnection, err error) {
 	if config.WebsocketURL == "" {
-		socket, err = ConnectSocket(config.Host, config.Port, config.TLS, config.TLSConfig)
+		conn, err = ConnectSocket(config.Host, config.Port, config.TLS, config.TLSConfig)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		socket, err = NewIRCWebSocket(config.WebsocketURL, config.Origin, config.TLSConfig)
+		conn, err = NewIRCWebSocket(config.WebsocketURL, config.Origin, config.TLSConfig)
 		if err != nil {
 			return nil, err
 		}
 	}
-
-	return socket, err
+	return
 }
