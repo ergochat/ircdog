@@ -1,4 +1,4 @@
-//go:build websocket
+//go:build !minimal
 
 package lib
 
