@@ -1,4 +1,4 @@
-.PHONY: all build install release test gofmt
+.PHONY: all build install release test gofmt minimal
 
 GIT_COMMIT := $(shell git rev-parse HEAD 2> /dev/null)
 GIT_TAG := $(shell git tag --points-at HEAD 2> /dev/null | head -n 1)
@@ -12,8 +12,8 @@ all: build
 build:
 	go build -v -ldflags "-X main.commit=$(GIT_COMMIT) -X main.version=$(GIT_TAG)"
 
-websocket:
-	go build -tags websocket -v -ldflags "-X main.commit=$(GIT_COMMIT) -X main.version=$(GIT_TAG)"
+minimal:
+	go build -tags minimal -v -ldflags "-X main.commit=$(GIT_COMMIT) -X main.version=$(GIT_TAG)"
 
 install:
 	go install -v -ldflags "-X main.commit=$(GIT_COMMIT) -X main.version=$(GIT_TAG)"
