@@ -29,7 +29,7 @@ func NewConnection(config ConnectionConfig) (IRCSocket, error) {
 			return nil, err
 		}
 	} else {
-		socket, err = NewIRCWebSocket(config.WebsocketURL, config.Origin, config.TLSConfig)
+		socket, err = NewIRCWebSocket(config.WebsocketURL, config.Origin, config.TLS, config.TLSConfig)
 		if err != nil {
 			return nil, err
 		}

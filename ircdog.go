@@ -64,6 +64,7 @@ Sending Escapes:
 Options:
 	--tls               Connect using TLS.
 	--tls-noverify      Don't verify the provided TLS certificates.
+	--tls-cert=<file>   A file containing a TLS client cert & key, to use for TLS connections.
 	--listen=<address>  Listen on an address like ":7778", pass through traffic.
 	--hide=<messages>   Comma-separated list of commands/numerics to not print.
 	--origin=<url>      URL to send as the Origin header for a WebSocket connection
@@ -152,11 +153,20 @@ func parseConnectionConfig(arguments map[string]any) (config lib.ConnectionConfi
 		config.Origin = originString.(string)
 	}
 
+	config.TLSConfig = &tls.Config{}
 	if tlsNoverify {
-		config.TLSConfig = &tls.Config{
-			InsecureSkipVerify: true,
-		}
+		config.TLSConfig.InsecureSkipVerify = true
 	}
+	if tlsCert := arguments["--tls-cert"]; tlsCert != nil {
+		tlsCert, tErr := tls.LoadX509KeyPair(tlsCert.(string), tlsCert.(string))
+
+		if tErr != nil {
+			err = fmt.Errorf("Cannot load TLS cert/key: %w", tErr)
+			return
+		}
+		config.TLSConfig.Certificates = []tls.Certificate{tlsCert}
+	}
+
 	return
 }
 

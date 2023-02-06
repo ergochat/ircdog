@@ -20,7 +20,7 @@ type IRCWebSocket struct {
 	websocket  *websocket.Conn
 }
 
-func NewIRCWebSocket(wsUrl, origin string, tlsConfig *tls.Config) (IRCSocket, error) {
+func NewIRCWebSocket(wsUrl, origin string, useTLS bool, tlsConfig *tls.Config) (IRCSocket, error) {
 	var headers http.Header
 	if origin != "" {
 		headers = make(http.Header)
@@ -36,8 +36,11 @@ func NewIRCWebSocket(wsUrl, origin string, tlsConfig *tls.Config) (IRCSocket, er
 
 	dialer := websocket.Dialer{
 		Subprotocols:    []string{"text.ircv3.net", "binary.ircv3.net"},
-		TLSClientConfig: tlsConfig,
 	}
+	if useTLS {
+		dialer.TLSClientConfig = tlsConfig
+	}
+
 	ws, resp, err := dialer.Dial(wsUrl, headers)
 	if err != nil {
 		explanation := "no HTTP response"
