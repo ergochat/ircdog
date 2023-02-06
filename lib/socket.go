@@ -24,13 +24,6 @@ var (
 	ErrorDisconnected = errors.New("Socket is disconnected")
 )
 
-type IRCSocket interface {
-	SendLine(string) error
-	GetLine() (string, error)
-	Disconnect()
-	RemoteAddr() net.Addr
-}
-
 // Socket appropriately buffers IRC lines.
 type Socket struct {
 	connection net.Conn

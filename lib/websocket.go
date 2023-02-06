@@ -20,7 +20,7 @@ type IRCWebSocket struct {
 	websocket  *websocket.Conn
 }
 
-func NewIRCWebSocket(wsUrl, origin string, tlsConfig *tls.Config) (IRCSocket, error) {
+func NewIRCWebSocket(wsUrl, origin string, tlsConfig *tls.Config) (IRCConnection, error) {
 	var headers http.Header
 	if origin != "" {
 		headers = make(http.Header)
