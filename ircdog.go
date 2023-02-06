@@ -62,19 +62,20 @@ Sending Escapes:
 	---------------------------------
 
 Options:
-	--tls               Connect using TLS.
-	--tls-noverify      Don't verify the provided TLS certificates.
-	--listen=<address>  Listen on an address like ":7778", pass through traffic.
-	--hide=<messages>   Comma-separated list of commands/numerics to not print.
-	--origin=<url>      URL to send as the Origin header for a WebSocket connection
-	-r --raw            Don't interpret IRC control codes when sending or receiving lines.
-	--escape            Display incoming lines with irc-go escapes:
-	                    https://pkg.go.dev/github.com/goshuirc/irc-go/ircfmt
-	--italics           Enable ANSI italics codes (not widely supported).
-	--color=<mode>      Override detected color support ('none', '16', '256')
-	-p --nopings        Don't automatically respond to incoming pings.
-	-h --help           Show this screen.
-	--version           Show version.`
+	--tls                 Connect using TLS.
+	--tls-noverify        Don't verify the provided TLS certificates.
+	--client-cert=<file>  A file containing a TLS client cert & key, to use for TLS connections.
+	--listen=<address>    Listen on an address like ":7778", pass through traffic.
+	--hide=<messages>     Comma-separated list of commands/numerics to not print.
+	--origin=<url>        URL to send as the Origin header for a WebSocket connection
+	-r --raw              Don't interpret IRC control codes when sending or receiving lines.
+	--escape              Display incoming lines with irc-go escapes:
+	                      https://pkg.go.dev/github.com/goshuirc/irc-go/ircfmt
+	--italics             Enable ANSI italics codes (not widely supported).
+	--color=<mode>        Override detected color support ('none', '16', '256')
+	-p --nopings          Don't automatically respond to incoming pings.
+	-h --help             Show this screen.
+	--version             Show version.`
 )
 
 func parsePort(portStr string) (port int, err error) {
@@ -157,6 +158,21 @@ func parseConnectionConfig(arguments map[string]any) (config lib.ConnectionConfi
 			InsecureSkipVerify: true,
 		}
 	}
+
+	if clientCert := arguments["--client-cert"]; clientCert != nil {
+		if config.TLSConfig == nil {
+			config.TLSConfig = new(tls.Config)
+		}
+
+		clientCert, tErr := tls.LoadX509KeyPair(clientCert.(string), clientCert.(string))
+
+		if tErr != nil {
+			err = fmt.Errorf("Cannot load TLS client cert/key: %w", tErr)
+			return
+		}
+		config.TLSConfig.Certificates = []tls.Certificate{clientCert}
+	}
+
 	return
 }
 
