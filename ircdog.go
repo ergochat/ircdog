@@ -153,11 +153,17 @@ func parseConnectionConfig(arguments map[string]any) (config lib.ConnectionConfi
 		config.Origin = originString.(string)
 	}
 
-	config.TLSConfig = &tls.Config{}
 	if tlsNoverify {
-		config.TLSConfig.InsecureSkipVerify = true
+		config.TLSConfig = &tls.Config{
+			InsecureSkipVerify: true,
+		}
 	}
+
 	if tlsCert := arguments["--tls-cert"]; tlsCert != nil {
+		if config.TLSConfig == nil {
+			config.TLSConfig = new(tls.Config)
+		}
+
 		tlsCert, tErr := tls.LoadX509KeyPair(tlsCert.(string), tlsCert.(string))
 
 		if tErr != nil {

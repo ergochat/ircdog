@@ -11,6 +11,6 @@ var (
 	errNoWSSupport = errors.New("websocket support disabled at compile time")
 )
 
-func NewIRCWebSocket(wsUrl, origin string, useTLS bool, tlsConfig *tls.Config) (IRCSocket, error) {
+func NewIRCWebSocket(wsUrl, origin string, tlsConfig *tls.Config) (IRCSocket, error) {
 	return nil, errNoWSSupport
 }
