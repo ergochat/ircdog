@@ -43,6 +43,10 @@ Usage:
 	ircdog -h | --help
 	ircdog --version
 
+	The <host> argument can be a URL, in which case the <port> argument is optional.
+	wss:// (WebSocket over TLS), ws:// (WebSocket over plaintext), ircs:// (IRC over
+	TLS), and irc:// (IRC over plaintext) URLs are accepted.
+
 Sending Escapes:
 	ircdog supports escape sequences in its input (use --raw to disable this).
 	The following are case-sensitive:
@@ -74,6 +78,7 @@ Options:
 	--italics             Enable ANSI italics codes (not widely supported).
 	--color=<mode>        Override detected color support ('none', '16', '256')
 	-p --nopings          Don't automatically respond to incoming pings.
+	-v --verbose          Output additional loglines.
 	-h --help             Show this screen.
 	--version             Show version.`
 )
@@ -207,7 +212,8 @@ func determineColorLevel(colorArg any) (colorLevel lib.ColorLevel) {
 }
 
 func main() {
-	version := lib.SemVer
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+	version := fmt.Sprintf("ircdog %s", lib.SemVer)
 	arguments, _ := docopt.Parse(usage, nil, true, version, false)
 
 	connectionConfig, err := parseConnectionConfig(arguments)
@@ -238,11 +244,14 @@ func main() {
 
 	colorLevel := determineColorLevel(arguments["--color"])
 
+	verbose := arguments["--verbose"].(bool)
+
 	var exitStatus int
 	if listenAddr := arguments["--listen"]; listenAddr == nil {
 		exitStatus = connectExternal(
 			connectionConfig,
 			hiddenCommands, raw, escape, answerPings, useItalics, colorLevel,
+			verbose,
 		)
 	} else {
 		exitStatus = listenAndConnectExternal(
@@ -256,7 +265,8 @@ func main() {
 func connectExternal(
 	connectionConfig lib.ConnectionConfig,
 	hiddenCommands map[string]bool,
-	raw, escape, answerPings, useItalics bool, colorLevel lib.ColorLevel) int {
+	raw, escape, answerPings, useItalics bool, colorLevel lib.ColorLevel,
+	verbose bool) int {
 
 	console, err := lib.NewStandardConsole()
 	if err != nil {
@@ -265,10 +275,16 @@ func connectExternal(
 	}
 	defer console.Close()
 
+	if verbose {
+		log.Printf("** ircdog connecting to remote host")
+	}
 	connection, err := lib.NewConnection(connectionConfig)
 	if err != nil {
 		log.Printf("** ircdog could not create new connection: %s\n", err.Error())
 		return 1
+	}
+	if verbose {
+		log.Printf("** ircdog connected to remote host at %s", connection.RemoteAddr().String())
 	}
 	defer connection.Disconnect()
 
@@ -414,7 +430,7 @@ func (m *listenConnectionManager) acceptLoop() int {
 				clientConn.Close()
 				m.activeConnection.CompareAndSwap(connectionID, 0)
 			}
-			log.Printf("** ircdog connected to remote at %s", server.RemoteAddr().String())
+			log.Printf("** ircdog connected to remote host at %s", server.RemoteAddr().String())
 			client := lib.MakeSocket(clientConn)
 			go m.relay(connectionID, client, server, true)
 			go m.relay(connectionID, server, client, false)
