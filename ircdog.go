@@ -240,7 +240,7 @@ func main() {
 	escape := arguments["--escape"].(bool)
 	useItalics := arguments["--italics"].(bool)
 	if raw && (escape || useItalics) {
-		log.Fatalf("Cannot combine --raw with --escape or --italics")
+		log.Fatal("Cannot combine --raw with --escape or --italics")
 	}
 	answerPings := !arguments["--nopings"].(bool)
 
@@ -248,6 +248,9 @@ func main() {
 
 	verbose := arguments["--verbose"].(bool)
 	enableReadline := arguments["--readline"].(bool)
+	if raw && enableReadline {
+		log.Fatal("Cannot enable readline support with --raw")
+	}
 
 	var exitStatus int
 	if listenAddr := arguments["--listen"]; listenAddr == nil {
@@ -272,7 +275,7 @@ func connectExternal(
 	verbose, enableReadline bool) int {
 	var console lib.Console
 	var err error
-	if enableReadline {
+	if !raw && enableReadline {
 		console, err = readline.NewReadline("")
 	} else {
 		console, err = lib.NewStandardConsole()
