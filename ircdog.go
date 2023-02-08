@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -27,7 +28,6 @@ import (
 )
 
 // set via linker flags, either by make or by goreleaser:
-// TODO these are not used yet (we're just using lib.SemVer)
 var commit = ""  // git hash
 var version = "" // tagged version
 
@@ -213,10 +213,22 @@ func determineColorLevel(colorArg any) (colorLevel lib.ColorLevel) {
 	return
 }
 
+func versionString() string {
+	var semVer string
+	if version != "" {
+		semVer = version
+	} else if commit != "" {
+		semVer = fmt.Sprintf("%s-%s", lib.SemVer, commit)
+	} else {
+		semVer = lib.SemVer
+	}
+
+	return fmt.Sprintf("ircdog %s [%s]", semVer, runtime.Version())
+}
+
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
-	version := fmt.Sprintf("ircdog %s", lib.SemVer)
-	arguments, _ := docopt.Parse(usage, nil, true, version, false)
+	arguments, _ := docopt.Parse(usage, nil, true, versionString(), false)
 
 	connectionConfig, err := parseConnectionConfig(arguments)
 	if err != nil {
