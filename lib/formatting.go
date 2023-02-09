@@ -178,7 +178,7 @@ func IRCLineToAnsi(line string, colorLevel ColorLevel, outputItalics bool) strin
 	remaining := line
 
 	skipPastNextSpace := func(in string) (ok bool, out string) {
-		if idx := strings.IndexByte(remaining, ' '); idx != -1 {
+		if idx := strings.IndexByte(in, ' '); idx != -1 {
 			return true, trimInitialSpaces(in[idx+1:])
 		} else {
 			return false, in
