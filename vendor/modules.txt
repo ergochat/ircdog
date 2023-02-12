@@ -4,7 +4,7 @@ github.com/chzyer/readline
 # github.com/docopt/docopt-go v0.0.0-20160216232012-784ddc588536
 ## explicit
 github.com/docopt/docopt-go
-# github.com/ergochat/irc-go v0.2.1-0.20230130043046-32c55edbb0b6
+# github.com/ergochat/irc-go v0.2.1-0.20230212222948-740404c5de9e
 ## explicit; go 1.15
 github.com/ergochat/irc-go/ircfmt
 github.com/ergochat/irc-go/ircmsg

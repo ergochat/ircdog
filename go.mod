@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/chzyer/readline v1.5.1
 	github.com/docopt/docopt-go v0.0.0-20160216232012-784ddc588536
-	github.com/ergochat/irc-go v0.2.1-0.20230130043046-32c55edbb0b6
+	github.com/ergochat/irc-go v0.2.1-0.20230212222948-740404c5de9e
 	github.com/gorilla/websocket v1.5.0
 	github.com/jwalton/go-supportscolor v1.1.0
 )
