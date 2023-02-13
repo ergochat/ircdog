@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"sync"
+	"sync/atomic"
 )
 
 var (
@@ -26,6 +27,8 @@ type Operation struct {
 	outchan chan []rune
 	errchan chan error
 	w       io.Writer
+	wrapOut atomic.Pointer[wrapWriter]
+	wrapErr atomic.Pointer[wrapWriter]
 
 	history *opHistory
 	*opSearch
@@ -45,10 +48,6 @@ type wrapWriter struct {
 }
 
 func (w *wrapWriter) Write(b []byte) (int, error) {
-	if !w.t.IsReading() {
-		return w.target.Write(b)
-	}
-
 	var (
 		n   int
 		err error
@@ -366,11 +365,11 @@ func (o *Operation) ioloop() {
 }
 
 func (o *Operation) Stderr() io.Writer {
-	return &wrapWriter{target: o.GetConfig().Stderr, r: o, t: o.t}
+	return o.wrapErr.Load()
 }
 
 func (o *Operation) Stdout() io.Writer {
-	return &wrapWriter{target: o.GetConfig().Stdout, r: o, t: o.t}
+	return o.wrapOut.Load()
 }
 
 func (o *Operation) String() (string, error) {
@@ -470,6 +469,9 @@ func (op *Operation) SetConfig(cfg *Config) (*Config, error) {
 	op.SetMaskRune(cfg.MaskRune)
 	op.buf.SetConfig(cfg)
 	width := op.cfg.FuncGetWidth()
+
+	op.wrapOut.Store(&wrapWriter{target: cfg.Stdout, r: op, t: op.t})
+	op.wrapErr.Store(&wrapWriter{target: cfg.Stderr, r: op, t: op.t})
 
 	if cfg.opHistory == nil {
 		op.SetHistoryPath(cfg.HistoryFile)
