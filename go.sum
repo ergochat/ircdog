@@ -14,6 +14,8 @@ github.com/jwalton/go-supportscolor v1.1.0 h1:HsXFJdMPjRUAx8cIW6g30hVSFYaxh9yRQw
 github.com/jwalton/go-supportscolor v1.1.0/go.mod h1:hFVUAZV2cWg+WFFC4v8pT2X/S2qUUBYMioBD9AINXGs=
 github.com/slingamn/readline v0.0.0-20230208010630-f0118c04f03c h1:RIjyKEmkJ+FwSwX9tSZ2wuESbH3hnXv3EeuO/VkqePo=
 github.com/slingamn/readline v0.0.0-20230208010630-f0118c04f03c/go.mod h1:Eh+b79XXUwfKfcPLepksvw2tcLE/Ct21YObkaSkeBlk=
+github.com/slingamn/readline v0.0.0-20230213032618-9c2be2d25747 h1:bqQuJJ0tEtVYPdrd8xySwU2aY0VL3CjRnxwa2Nlb1Us=
+github.com/slingamn/readline v0.0.0-20230213032618-9c2be2d25747/go.mod h1:Eh+b79XXUwfKfcPLepksvw2tcLE/Ct21YObkaSkeBlk=
 golang.org/x/sys v0.0.0-20201119102817-f84b799fce68/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20210220050731-9a76102bfb43/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20220310020820-b874c991c1a5 h1:y/woIyUBFbpQGKS0u1aHF/40WUDnek3fPOyD08H5Vng=

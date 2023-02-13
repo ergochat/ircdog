@@ -15,4 +15,4 @@ require (
 	golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d // indirect
 )
 
-replace github.com/chzyer/readline => github.com/slingamn/readline v0.0.0-20230208010630-f0118c04f03c
+replace github.com/chzyer/readline => github.com/slingamn/readline v0.0.0-20230213032618-9c2be2d25747

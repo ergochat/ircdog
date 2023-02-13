@@ -5,6 +5,7 @@ import (
 	"container/list"
 	"fmt"
 	"io"
+	"sync/atomic"
 )
 
 const (
@@ -29,21 +30,22 @@ type opSearch struct {
 	cfg       *Config
 	markStart int
 	markEnd   int
-	width     int
+	width     atomic.Int32
 }
 
 func newOpSearch(w io.Writer, buf *RuneBuffer, history *opHistory, cfg *Config, width int) *opSearch {
-	return &opSearch{
+	o := &opSearch{
 		w:       w,
 		buf:     buf,
 		cfg:     cfg,
 		history: history,
-		width:   width,
 	}
+	o.width.Store(int32(width))
+	return o
 }
 
 func (o *opSearch) OnWidthChange(newWidth int) {
-	o.width = newWidth
+	o.width.Store(int32(newWidth))
 }
 
 func (o *opSearch) IsSearchMode() bool {
@@ -97,7 +99,7 @@ func (o *opSearch) SearchChar(r rune) {
 }
 
 func (o *opSearch) SearchMode(dir int) bool {
-	if o.width == 0 {
+	if o.width.Load() == 0 {
 		return false
 	}
 	alreadyInMode := o.inMode
@@ -135,7 +137,7 @@ func (o *opSearch) SearchRefresh(x int) {
 	}
 	x = o.buf.CurrentWidth(x)
 	x += o.buf.PromptLen()
-	x = x % o.width
+	x = x % int(o.width.Load())
 
 	if o.markStart > 0 {
 		o.buf.SetStyle(o.markStart, o.markEnd, "4")

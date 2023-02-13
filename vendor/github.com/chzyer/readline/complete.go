@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"sync/atomic"
 )
 
 type AutoCompleter interface {
@@ -27,7 +28,7 @@ func (t *TabCompleter) Do([]rune, int) ([][]rune, int) {
 type opCompleter struct {
 	w     io.Writer
 	op    *Operation
-	width int
+	width atomic.Int32
 
 	inCompleteMode  bool
 	inSelectMode    bool
@@ -39,11 +40,12 @@ type opCompleter struct {
 }
 
 func newOpCompleter(w io.Writer, op *Operation, width int) *opCompleter {
-	return &opCompleter{
+	o := &opCompleter{
 		w:     w,
 		op:    op,
-		width: width,
 	}
+	o.width.Store(int32(width))
+	return o
 }
 
 func (o *opCompleter) doSelect() {
@@ -65,7 +67,7 @@ func (o *opCompleter) nextCandidate(i int) {
 }
 
 func (o *opCompleter) OnComplete() bool {
-	if o.width == 0 {
+	if o.width.Load() == 0 {
 		return false
 	}
 	if o.IsInCompleteSelectMode() {
@@ -182,7 +184,7 @@ func (o *opCompleter) getMatrixSize() int {
 }
 
 func (o *opCompleter) OnWidthChange(newWidth int) {
-	o.width = newWidth
+	o.width.Store(int32(newWidth))
 }
 
 func (o *opCompleter) CompleteRefresh() {
@@ -201,7 +203,7 @@ func (o *opCompleter) CompleteRefresh() {
 	same := o.op.buf.RuneSlice(-o.candidateOff)
 
 	// -1 to avoid reach the end of line
-	width := o.width - 1
+	width := int(o.width.Load()) - 1
 	colNum := width / colWidth
 	if colNum != 0 {
 		colWidth += (width - (colWidth * colNum)) / colNum
