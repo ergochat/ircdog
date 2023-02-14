@@ -3,6 +3,20 @@ All notable changes to ircdog will be documented in this file.
 
 This project adheres to [Semantic Versioning](http://semver.org/). For the purposes of versioning, we consider the "public API" to refer to the configuration files and CLI.
 
+## [0.4.0] - 2023-02-19
+ircdog v0.4.0 is a new release with fixes and enhancements:
+
+* WebSocket support: pass a WebSocket URL, e.g. `wss://testnet.ergo.chat/webirc` as the host, omitting the separate port parameter
+* `--origin` flag to set the `Origin` header for a WebSocket connection if necessary
+* Support for `ircs://` and `irc://` URLs as the host, omitting a separate port parameter
+* Support for TLS client certificates: pass `--client-cert=<file>` containing both the certificate and its private key in plaintext (#29, thanks [@jesopo](https://github.com/jesopo)!)
+* Support for arbitrary C hex escapes in output, e.g. `[[\x00]]` to send the null byte (`--raw` disables interpretation of escapes)
+* Experimental support for readline-like functionality, including up-arrow and Ctrl-R history retrieval. For now, this must be enabled explicitly with `--readline`
+* 256-color support (if supported by the terminal); use `--color=<none,16,256>` to override detected color support
+* `--listen` supports reconnections without the need to restart ircdog (only one connection is allowed at a time)
+* `--verbose` flag
+* Fixed `--hide=PING` breaking automatic replies to `PING` (#23, thanks [@KoraggKnightWolf](https://github.com/KoraggKnightWolf)!)
+
 ## [0.3.0] - 2022-03-18
 ircdog v0.3.0 is a new release with a few bug fixes:
 
