@@ -481,14 +481,15 @@ func (m *listenConnectionManager) relay(connectionID uint64, input, output lib.I
 	}()
 
 	var inputName, outputName, marker string
+	usePlainMarkers := m.raw || m.escape || m.colorLevel == lib.ColorLevelNone
 	if inputIsClient {
 		inputName, outputName, marker = "client", "server", c2sMarkerColor
-		if m.escape || m.colorLevel == lib.ColorLevelNone {
+		if usePlainMarkers {
 			marker = c2sMarkerPlain
 		}
 	} else {
 		inputName, outputName, marker = "server", "client", s2cMarkerColor
-		if m.escape || m.colorLevel == lib.ColorLevelNone {
+		if usePlainMarkers {
 			marker = s2cMarkerPlain
 		}
 	}
@@ -507,7 +508,7 @@ func (m *listenConnectionManager) relay(connectionID uint64, input, output lib.I
 		// print line
 		m.outputMutex.Lock()
 		if m.raw {
-			fmt.Println(line)
+			fmt.Printf("%s%s\n", marker, line)
 		} else if m.escape {
 			fmt.Printf("%s%s\n", marker, ircfmt.Escape(line))
 		} else {
