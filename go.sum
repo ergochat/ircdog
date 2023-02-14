@@ -8,6 +8,8 @@ github.com/ergochat/irc-go v0.2.1-0.20230130043046-32c55edbb0b6 h1:384/IQ1KmdjIX
 github.com/ergochat/irc-go v0.2.1-0.20230130043046-32c55edbb0b6/go.mod h1:2vi7KNpIPWnReB5hmLpl92eMywQvuIeIIGdt/FQCph0=
 github.com/ergochat/irc-go v0.2.1-0.20230212222948-740404c5de9e h1:lkf3II++QLiGUcKfb9DTsKcTbo33C2wLwn0Mkg+eE0c=
 github.com/ergochat/irc-go v0.2.1-0.20230212222948-740404c5de9e/go.mod h1:2vi7KNpIPWnReB5hmLpl92eMywQvuIeIIGdt/FQCph0=
+github.com/ergochat/irc-go v0.3.0 h1:qgvb2knh8d6yIVsHX+PRQ2CiRj1NGG5x88ABmR1lWng=
+github.com/ergochat/irc-go v0.3.0/go.mod h1:2vi7KNpIPWnReB5hmLpl92eMywQvuIeIIGdt/FQCph0=
 github.com/gorilla/websocket v1.5.0 h1:PPwGk2jz7EePpoHN/+ClbZu8SPxiqlu12wZP/3sWmnc=
 github.com/gorilla/websocket v1.5.0/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 github.com/jwalton/go-supportscolor v1.1.0 h1:HsXFJdMPjRUAx8cIW6g30hVSFYaxh9yRQwEWgkAR7lQ=
