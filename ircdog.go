@@ -74,6 +74,7 @@ Options:
 	--hide=<messages>     Comma-separated list of commands/numerics to not print.
 	--origin=<url>        URL to send as the Origin header for a WebSocket connection
 	-r --raw              Don't interpret IRC control codes when sending or receiving lines.
+	--transcript=<file>   Append a transcript of raw traffic to a file
 	--escape              Display incoming lines with irc-go escapes:
 	                      https://pkg.go.dev/github.com/goshuirc/irc-go/ircfmt
 	--italics             Enable ANSI italics codes (not widely supported).
@@ -264,17 +265,27 @@ func main() {
 		log.Fatal("Cannot enable readline support with --raw")
 	}
 
+	var transcript *lib.Transcript
+	if transcriptFile := arguments["--transcript"]; transcriptFile != nil {
+		transcript, err = lib.NewTranscript(transcriptFile.(string))
+		if err != nil {
+			log.Fatalf("Could not open transcript file: %v", err)
+		}
+	}
+	// no more log.Fatal from here on out, it would break this defer:
+	defer transcript.Close()
+
 	var exitStatus int
 	if listenAddr := arguments["--listen"]; listenAddr == nil {
 		exitStatus = connectExternal(
-			connectionConfig,
-			hiddenCommands, raw, escape, answerPings, useItalics, colorLevel,
+			connectionConfig, hiddenCommands, transcript,
+			raw, escape, answerPings, useItalics, colorLevel,
 			verbose, enableReadline,
 		)
 	} else {
 		exitStatus = listenAndConnectExternal(
-			listenAddr.(string), connectionConfig,
-			hiddenCommands, raw, escape, useItalics, colorLevel,
+			listenAddr.(string), connectionConfig, hiddenCommands, transcript,
+			raw, escape, useItalics, colorLevel,
 		)
 	}
 	os.Exit(exitStatus)
@@ -282,7 +293,7 @@ func main() {
 
 func connectExternal(
 	connectionConfig lib.ConnectionConfig,
-	hiddenCommands map[string]bool,
+	hiddenCommands map[string]bool, transcript *lib.Transcript,
 	raw, escape, answerPings, useItalics bool, colorLevel lib.ColorLevel,
 	verbose, enableReadline bool) int {
 	var console lib.Console
@@ -323,6 +334,9 @@ func connectExternal(
 
 		for {
 			line, err := connection.GetLine()
+			if line != "" || err == nil {
+				transcript.WriteLine(line, false)
+			}
 			if err != nil {
 				log.Println("** ircdog disconnected:", err.Error())
 				return
@@ -358,6 +372,9 @@ func connectExternal(
 
 		for {
 			line, err := console.Readline()
+			if line != "" || err == nil {
+				transcript.WriteLine(line, true)
+			}
 			if err != nil {
 				if err != io.EOF {
 					log.Println("** ircdog error: failed to read new input line:", err.Error())
@@ -394,6 +411,7 @@ type listenConnectionManager struct {
 	ln               net.Listener
 	connectionConfig lib.ConnectionConfig
 	hiddenCommands   map[string]bool
+	transcript       *lib.Transcript
 	raw              bool
 	escape           bool
 	useItalics       bool
@@ -409,7 +427,7 @@ type listenConnectionManager struct {
 
 func listenAndConnectExternal(
 	listenAddress string, connectionConfig lib.ConnectionConfig,
-	hiddenCommands map[string]bool,
+	hiddenCommands map[string]bool, transcript *lib.Transcript,
 	raw, escape, useItalics bool, colorLevel lib.ColorLevel) int {
 
 	ln, err := net.Listen("tcp", listenAddress)
@@ -425,6 +443,7 @@ func listenAndConnectExternal(
 		ln:               ln,
 		connectionConfig: connectionConfig,
 		hiddenCommands:   hiddenCommands,
+		transcript:       transcript,
 		raw:              raw,
 		escape:           escape,
 		useItalics:       useItalics,
@@ -496,6 +515,9 @@ func (m *listenConnectionManager) relay(connectionID uint64, input, output lib.I
 
 	for {
 		line, err := input.GetLine()
+		if line != "" || err == nil {
+			m.transcript.WriteLine(line, inputIsClient)
+		}
 		if err != nil {
 			log.Printf("** ircdog %s disconnected: %v", inputName, err.Error())
 			return
