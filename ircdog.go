@@ -362,6 +362,7 @@ func connectExternal(
 					fmt.Fprintln(console, pong)
 				}
 				connection.SendLine(pong)
+				transcript.WriteLine(pong, true)
 			}
 		}
 	}()
@@ -372,25 +373,24 @@ func connectExternal(
 
 		for {
 			line, err := console.Readline()
-			if line != "" || err == nil {
-				transcript.WriteLine(line, true)
-			}
 			if err != nil {
 				if err != io.EOF {
 					log.Println("** ircdog error: failed to read new input line:", err.Error())
 				}
 				return
 			}
+			line = strings.TrimRight(line, "\r\n")
 
 			if !raw {
 				line = lib.ReplaceControlCodes(line)
 			}
 
-			err = connection.SendLine(strings.TrimRight(line, "\r\n"))
+			err = connection.SendLine(line)
 			if err != nil {
 				log.Println("** ircdog error: failed to send line:", err.Error())
 				return
 			}
+			transcript.WriteLine(line, true)
 		}
 	}()
 
