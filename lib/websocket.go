@@ -14,7 +14,6 @@ import (
 )
 
 type IRCWebSocket struct {
-	readMutex  sync.Mutex
 	writeMutex sync.Mutex
 	closeOnce  sync.Once
 	websocket  *websocket.Conn
@@ -52,9 +51,6 @@ func NewIRCWebSocket(wsUrl, origin string, tlsConfig *tls.Config) (IRCConnection
 }
 
 func (w *IRCWebSocket) GetLine() (string, error) {
-	w.readMutex.Lock()
-	defer w.readMutex.Unlock()
-
 	_, lineBytes, err := w.websocket.ReadMessage()
 	return string(lineBytes), err
 }
