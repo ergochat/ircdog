@@ -24,6 +24,7 @@ import (
 	"github.com/ergochat/irc-go/ircmsg"
 
 	"github.com/ergochat/ircdog/lib"
+	"github.com/ergochat/ircdog/readline"
 )
 
 // set via linker flags, either by make or by goreleaser:
@@ -77,6 +78,7 @@ Options:
 	                      https://pkg.go.dev/github.com/goshuirc/irc-go/ircfmt
 	--italics             Enable ANSI italics codes (not widely supported).
 	--color=<mode>        Override detected color support ('none', '16', '256')
+	--readline            Enable experimental readline support
 	-p --nopings          Don't automatically respond to incoming pings.
 	-v --verbose          Output additional loglines.
 	-h --help             Show this screen.
@@ -250,20 +252,24 @@ func main() {
 	escape := arguments["--escape"].(bool)
 	useItalics := arguments["--italics"].(bool)
 	if raw && (escape || useItalics) {
-		log.Fatalf("Cannot combine --raw with --escape or --italics")
+		log.Fatal("Cannot combine --raw with --escape or --italics")
 	}
 	answerPings := !arguments["--nopings"].(bool)
 
 	colorLevel := determineColorLevel(arguments["--color"])
 
 	verbose := arguments["--verbose"].(bool)
+	enableReadline := arguments["--readline"].(bool)
+	if raw && enableReadline {
+		log.Fatal("Cannot enable readline support with --raw")
+	}
 
 	var exitStatus int
 	if listenAddr := arguments["--listen"]; listenAddr == nil {
 		exitStatus = connectExternal(
 			connectionConfig,
 			hiddenCommands, raw, escape, answerPings, useItalics, colorLevel,
-			verbose,
+			verbose, enableReadline,
 		)
 	} else {
 		exitStatus = listenAndConnectExternal(
@@ -278,9 +284,14 @@ func connectExternal(
 	connectionConfig lib.ConnectionConfig,
 	hiddenCommands map[string]bool,
 	raw, escape, answerPings, useItalics bool, colorLevel lib.ColorLevel,
-	verbose bool) int {
-
-	console, err := lib.NewStandardConsole()
+	verbose, enableReadline bool) int {
+	var console lib.Console
+	var err error
+	if !raw && enableReadline {
+		console, err = readline.NewReadline("")
+	} else {
+		console, err = lib.NewStandardConsole()
+	}
 	if err != nil {
 		log.Printf("** ircdog could not initialize console: %s\n", err.Error())
 		return 1

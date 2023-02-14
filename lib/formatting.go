@@ -68,10 +68,10 @@ func normalizeChunk(chunk ircfmt.FormattedSubstring, colorLevel ColorLevel, outp
 	}
 	if colorLevel <= ColorLevelBasic {
 		if chunk.ForegroundColor.Value >= 16 {
-			chunk.ForegroundColor = ircfmt.IRCColor{}
+			chunk.ForegroundColor = ircfmt.ColorCode{}
 		}
 		if chunk.BackgroundColor.Value >= 16 {
-			chunk.BackgroundColor = ircfmt.IRCColor{}
+			chunk.BackgroundColor = ircfmt.ColorCode{}
 		}
 	}
 	return chunk
