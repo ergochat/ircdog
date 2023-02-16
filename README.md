@@ -1,8 +1,18 @@
 # ircdog
 
-ircdog is a simple wrapper over IRC that can respond to pings, and interprets formatting codes. Otherwise, it doesn't modify the sent/received data from the IRC server.
+`ircdog` is a tool for connecting to IRC servers and sending and receiving raw IRC protocol lines, similar to telnet or netcat, but with additional features:
 
-This tool's mostly useful for IRC protocol developers who want to see exactly what a server sends/receives.
+* Automatically responds to `PING`, keeping the connection alive without active user input (`-p` disables)
+* Renders [IRC formatting codes](https://modern.ircdocs.horse/formatting.html) for terminal display (`--raw` disables)
+* Supports connecting to servers over plaintext, TLS, or [WebSocket](https://ircv3.net/specs/extensions/websocket)
+* Can run as an intercepting proxy between another client and the server
+* Can produce a transcript of raw traffic
+* Supports escape sequences to easily send arbitrary binary data (`--raw` disables)
+* Supports TLS client certificates
+
+ircdog is primarily intended for IRC protocol developers who need to debug client or server behavior.
+
+For more details, see the online help: `ircdog --help`
 
 ---
 

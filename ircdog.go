@@ -32,12 +32,11 @@ var commit = ""  // git hash
 var version = "" // tagged version
 
 const (
-	usage = `ircdog is a very simple telnet-like connection helper for IRC. It connects
-to an IRC server and allows you to send and receive raw IRC protocol lines.
-By default, ircdog will respond to incoming PING messages from the server,
-keeping your connection alive without the need for active user input. It will
-also render IRC formatting codes (such as boldface or color codes) for
-terminal display.
+	usage = `ircdog connects to an IRC server, then sends and receives raw IRC protocol
+lines. Its interface is similar to telnet or netcat, but by default, it
+automatically responds to PING messages from the server, keeping your
+connection alive without the need for active user input. It also renders IRC
+formatting codes for terminal display.
 
 Usage:
 	ircdog <host> [<port>] [options]
@@ -72,14 +71,14 @@ Options:
 	--client-cert=<file>  A file containing a TLS client cert & key, to use for TLS connections.
 	--listen=<address>    Listen on an address like ":7778", pass through traffic.
 	--hide=<messages>     Comma-separated list of commands/numerics to not print.
-	--origin=<url>        URL to send as the Origin header for a WebSocket connection
-	-r --raw              Don't interpret IRC control codes when sending or receiving lines.
-	--transcript=<file>   Append a transcript of raw traffic to a file
+	--origin=<url>        URL to send as the Origin header for a WebSocket connection.
+	-r --raw              Don't interpret incoming formatting codes or outgoing escapes.
+	--transcript=<file>   Append a transcript of raw traffic to a file.
 	--escape              Display incoming lines with irc-go escapes:
 	                      https://pkg.go.dev/github.com/goshuirc/irc-go/ircfmt
 	--italics             Enable ANSI italics codes (not widely supported).
-	--color=<mode>        Override detected color support ('none', '16', '256')
-	--readline            Enable experimental readline support
+	--color=<mode>        Override detected color support ('none', '16', '256').
+	--readline            Enable experimental readline support.
 	-p --nopings          Don't automatically respond to incoming pings.
 	-v --verbose          Output additional loglines.
 	-h --help             Show this screen.
