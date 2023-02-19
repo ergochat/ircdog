@@ -301,7 +301,7 @@ func connectExternal(
 	var console lib.Console
 	var err error
 	if !raw && enableReadline {
-		console, err = readline.NewReadline("")
+		console, err = readline.NewReadline(os.Getenv("IRCDOG_HISTFILE"))
 	} else {
 		console, err = lib.NewStandardConsole()
 	}
