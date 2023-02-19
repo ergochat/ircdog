@@ -11,7 +11,7 @@ ircdog v0.4.0 is a new release with fixes and enhancements:
 * Support for `ircs://` and `irc://` URLs as the host, omitting a separate port parameter
 * Support for TLS client certificates: pass `--client-cert=<file>` containing both the certificate and its private key in plaintext (#29, thanks [@jesopo](https://github.com/jesopo)!)
 * Support for arbitrary C hex escapes in output, e.g. `[[\x00]]` to send the null byte (`--raw` disables interpretation of escapes)
-* Experimental support for readline-like functionality, including up-arrow and Ctrl-R history retrieval. For now, this must be enabled explicitly with `--readline`
+* Experimental support for readline-like functionality, including up-arrow and Ctrl-R history retrieval. For now, this must be enabled explicitly with `--readline`, or setting the environment variable `IRCDOG_READLINE=1`.
 * `--transcript=<file>` appends a transcript of raw traffic to the specified file
 * 256-color support (if supported by the terminal); use `--color=<none,16,256>` to override detected color support
 * `--listen` supports reconnections without the need to restart ircdog (only one connection is allowed at a time)
