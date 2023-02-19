@@ -263,6 +263,9 @@ func main() {
 	if raw && enableReadline {
 		log.Fatal("Cannot enable readline support with --raw")
 	}
+	if !raw && os.Getenv("IRCDOG_READLINE") == "1" {
+		enableReadline = true
+	}
 
 	var transcript *lib.Transcript
 	if transcriptFile := arguments["--transcript"]; transcriptFile != nil {
