@@ -14,6 +14,8 @@ ircdog is primarily intended for IRC protocol developers who need to debug clien
 
 For more details, see the online help: `ircdog --help`
 
+For instructions on how to build from source, see [DEVELOPING.md](https://github.com/ergochat/ircdog/blob/master/DEVELOPING.md).
+
 ---
 
 [![Example](docs/example.gif)](https://asciinema.org/a/bqmBrV8aIWDhvQqaxfpJrtj7r)

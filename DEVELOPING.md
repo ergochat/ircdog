@@ -1,11 +1,10 @@
 # Developing ircdog
 
-Most development happens on the `develop` branch, which is occasionally rebased + merged into `master` when it's not incredibly broken. When this happens, the `develop` branch is usually pruned until I feel like making 'unsafe' changes again.
+## Building from source
 
-I may also name the branch `develop+feature` if I'm developing multiple, or particularly unstable, features.
-
-The intent is to keep `master` relatively stable.
-
+1. Obtain an [up-to-date distribution of the Go language for your OS and architecture](https://go.dev/dl)
+1. Run `go version` to check that the expected version of Go is available on your `$PATH`
+1. Check out your desired branch or tag and run `make`. This will produce an executable binary named `ircdog` in the base directory of the project. (All dependencies are vendored, so you will not need to fetch any dependencies remotely.)
 
 ## Releasing a new version
 
