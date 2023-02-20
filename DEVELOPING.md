@@ -44,25 +44,6 @@ New release of ircdog!
 ### Fixed
 ```
 
-
-
-## Updating `vendor/`
-
-The `vendor/` directory holds our dependencies. When we import new repos, we need to update this folder to contain these new deps. This is something that I'll mostly be handling.
-
-To update this folder:
-
-1. Install https://github.com/golang/dep
-2. `cd` to ircdog's folder
-3. `dep ensure -update`
-4. `cd vendor`
-5. Commit the changes with the message `"Updated packages"`
-6. `cd ..`
-4. Commit the result with the message `"vendor: Updated submodules"`
-
-This will make sure things stay nice and up-to-date for users.
-
-
 ## Debugging Hangs
 
 To debug a hang, the best thing to do is to get a stack trace. Go's nice, and you can do so by running this:
