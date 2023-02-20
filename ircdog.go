@@ -487,7 +487,7 @@ func (m *listenConnectionManager) acceptLoop() int {
 
 const (
 	// printable indicators for whether the captured line is going from client to server,
-	// or vice versa. note that markers are not shown at all in --raw mode:
+	// or vice versa.
 	c2sMarkerPlain = " -> "
 	s2cMarkerPlain = " <- "
 	c2sMarkerColor = "\x1b[31;100m -> \x1b[0m"
