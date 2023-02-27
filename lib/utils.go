@@ -4,6 +4,9 @@
 package lib
 
 import (
+	"bufio"
+	"io"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -59,4 +62,24 @@ LineLoop:
 	}
 
 	return buf.String()
+}
+
+func ReadScript(filename string) (commands []string, err error) {
+	infile, err := os.Open(filename)
+	if err != nil {
+		return
+	}
+	defer infile.Close()
+	reader := bufio.NewReader(infile)
+	for {
+		line, err := reader.ReadString('\n')
+		if command := strings.TrimRight(line, "\r\n"); command != "" {
+			commands = append(commands, command)
+		}
+		if err == io.EOF {
+			return commands, nil
+		} else if err != nil {
+			return commands, err
+		}
+	}
 }
