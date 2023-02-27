@@ -1,4 +1,4 @@
-# github.com/chzyer/readline v1.5.1 => github.com/slingamn/readline v0.0.0-20230213051602-7bb0e056741f
+# github.com/chzyer/readline v1.5.1 => github.com/slingamn/readline v0.0.0-20230227035143-99fd32183842
 ## explicit; go 1.18
 github.com/chzyer/readline
 # github.com/docopt/docopt-go v0.0.0-20160216232012-784ddc588536
@@ -25,4 +25,4 @@ golang.org/x/sys/windows
 # golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d
 ## explicit; go 1.11
 golang.org/x/term
-# github.com/chzyer/readline => github.com/slingamn/readline v0.0.0-20230213051602-7bb0e056741f
+# github.com/chzyer/readline => github.com/slingamn/readline v0.0.0-20230227035143-99fd32183842
