@@ -403,8 +403,7 @@ func connectExternal(
 	}()
 
 	if script != "" {
-		scriptCommands, err := lib.ReadScript(script)
-		if err == nil {
+		if scriptCommands, err := lib.ReadScript(script); err == nil {
 			for _, command := range scriptCommands {
 				if err := connection.SendLine(command); err != nil {
 					log.Println("** ircdog error: failed to send line:", err.Error())
