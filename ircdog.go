@@ -79,6 +79,7 @@ Options:
 	--italics             Enable ANSI italics codes (not widely supported).
 	--color=<mode>        Override detected color support ('none', '16', '256').
 	--readline            Enable experimental readline support.
+	--script=<file>       Read an initial list of commands to send from a file.
 	-p --nopings          Don't automatically respond to incoming pings.
 	-v --verbose          Output additional loglines.
 	-h --help             Show this screen.
@@ -277,12 +278,17 @@ func main() {
 	// no more log.Fatal from here on out, it would break this defer:
 	defer transcript.Close()
 
+	var script string
+	if scriptArg := arguments["--script"]; scriptArg != nil {
+		script = scriptArg.(string)
+	}
+
 	var exitStatus int
 	if listenAddr := arguments["--listen"]; listenAddr == nil {
 		exitStatus = connectExternal(
 			connectionConfig, hiddenCommands, transcript,
 			raw, escape, answerPings, useItalics, colorLevel,
-			verbose, enableReadline,
+			verbose, enableReadline, script,
 		)
 	} else {
 		exitStatus = listenAndConnectExternal(
@@ -297,7 +303,7 @@ func connectExternal(
 	connectionConfig lib.ConnectionConfig,
 	hiddenCommands map[string]bool, transcript *lib.Transcript,
 	raw, escape, answerPings, useItalics bool, colorLevel lib.ColorLevel,
-	verbose, enableReadline bool) int {
+	verbose, enableReadline bool, script string) int {
 	var console lib.Console
 	var err error
 	if !raw && enableReadline {
@@ -395,6 +401,22 @@ func connectExternal(
 			transcript.WriteLine(line, true)
 		}
 	}()
+
+	if script != "" {
+		if scriptCommands, err := lib.ReadScript(script); err == nil {
+			for _, command := range scriptCommands {
+				if err := connection.SendLine(command); err != nil {
+					log.Println("** ircdog error: failed to send line:", err.Error())
+					return 1
+				}
+				transcript.WriteLine(command, true)
+				// don't bother handling --ignore for scripted commands
+				fmt.Fprintln(console, command)
+			}
+		} else {
+			log.Printf("** ircdog was unable to read script, ignoring: %v", err)
+		}
+	}
 
 	<-doneChan
 	return 0
