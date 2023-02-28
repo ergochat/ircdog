@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	docopt "github.com/docopt/docopt-go"
 	supportscolor "github.com/jwalton/go-supportscolor"
@@ -80,6 +81,8 @@ Options:
 	--color=<mode>        Override detected color support ('none', '16', '256').
 	--readline            Enable experimental readline support.
 	--script=<file>       Read an initial list of commands to send from a file.
+	--reconnect=<time>    If disconnected unexpectedly, reconnect after a pause
+	                      ('30' for 30 seconds, '5m' for 5 minutes, etc.)
 	-p --nopings          Don't automatically respond to incoming pings.
 	-v --verbose          Output additional loglines.
 	-h --help             Show this screen.
@@ -184,6 +187,17 @@ func parseConnectionConfig(arguments map[string]any) (config lib.ConnectionConfi
 	return
 }
 
+func parseReconnectDuration(reconnectArg any) (result time.Duration, err error) {
+	if reconnectArg == nil {
+		return 0, nil
+	}
+	reconnectStr := reconnectArg.(string)
+	if intSeconds, err := strconv.Atoi(reconnectStr); err == nil {
+		return time.Duration(intSeconds) * time.Second, nil
+	}
+	return time.ParseDuration(reconnectStr)
+}
+
 func determineColorLevel(colorArg any) (colorLevel lib.ColorLevel) {
 	// call this unconditionally for its side effects
 	// (it does something to Windows terminals to make them ANSI-compliant)
@@ -283,15 +297,20 @@ func main() {
 		script = scriptArg.(string)
 	}
 
+	reconnectDuration, err := parseReconnectDuration(arguments["--reconnect"])
+	if err != nil {
+		log.Fatalf("Invalid --reconnect argument: %v", err)
+	}
+
 	var exitStatus int
 	if listenAddr := arguments["--listen"]; listenAddr == nil {
-		exitStatus = connectExternal(
+		exitStatus = runClient(
 			connectionConfig, hiddenCommands, transcript,
 			raw, escape, answerPings, useItalics, colorLevel,
-			verbose, enableReadline, script,
+			verbose, enableReadline, script, reconnectDuration,
 		)
 	} else {
-		exitStatus = listenAndConnectExternal(
+		exitStatus = runListenProxy(
 			listenAddr.(string), connectionConfig, hiddenCommands, transcript,
 			raw, escape, useItalics, colorLevel,
 		)
@@ -299,11 +318,11 @@ func main() {
 	os.Exit(exitStatus)
 }
 
-func connectExternal(
+func runClient(
 	connectionConfig lib.ConnectionConfig,
 	hiddenCommands map[string]bool, transcript *lib.Transcript,
 	raw, escape, answerPings, useItalics bool, colorLevel lib.ColorLevel,
-	verbose, enableReadline bool, script string) int {
+	verbose, enableReadline bool, script string, reconnectDuration time.Duration) int {
 	var console lib.Console
 	var err error
 	if !raw && enableReadline {
@@ -316,29 +335,65 @@ func connectExternal(
 		return 1
 	}
 	defer console.Close()
+	lineChan := make(chan string)
+	go func() {
+		for {
+			line, err := console.Readline()
+			if err == nil {
+				lineChan <- line
+			} else {
+				if err != io.EOF {
+					log.Println("** ircdog error: failed to read new input line:", err.Error())
+				}
+				close(lineChan)
+				return
+			}
+		}
+	}()
 
+	for {
+		status := connectExternal(
+			console, lineChan, connectionConfig, hiddenCommands, transcript,
+			raw, escape, answerPings, useItalics, colorLevel,
+			verbose, script,
+		)
+		if status == 0 {
+			return 0
+		} else if reconnectDuration == 0 {
+			return status
+		} else {
+			log.Printf("** ircdog disconnected unexpectedly, waiting %v to reconnect", reconnectDuration)
+			time.Sleep(reconnectDuration)
+		}
+	}
+}
+
+func connectExternal(
+	console lib.Console, lineChan chan string, connectionConfig lib.ConnectionConfig,
+	hiddenCommands map[string]bool, transcript *lib.Transcript,
+	raw, escape, answerPings, useItalics bool, colorLevel lib.ColorLevel,
+	verbose bool, script string) (status int) {
+	status = 1
 	if verbose {
 		log.Printf("** ircdog connecting to remote host")
 	}
 	connection, err := lib.NewConnection(connectionConfig)
 	if err != nil {
 		log.Printf("** ircdog could not create new connection: %s\n", err.Error())
-		return 1
+		return
 	}
 	if verbose {
 		log.Printf("** ircdog connected to remote host at %s", connection.RemoteAddr().String())
 	}
 	defer connection.Disconnect()
 
-	// main goroutine will wait for either client or server EOF
-	doneChan := make(chan struct{}, 2)
-	done := func() {
-		doneChan <- struct{}{}
-	}
+	doneChan := make(chan struct{})
 
 	// process incoming lines from server
 	go func() {
-		defer done()
+		defer func() {
+			close(doneChan)
+		}()
 
 		for {
 			line, err := connection.GetLine()
@@ -375,33 +430,6 @@ func connectExternal(
 		}
 	}()
 
-	// process incoming lines from user
-	go func() {
-		defer done()
-
-		for {
-			line, err := console.Readline()
-			if err != nil {
-				if err != io.EOF {
-					log.Println("** ircdog error: failed to read new input line:", err.Error())
-				}
-				return
-			}
-			line = strings.TrimRight(line, "\r\n")
-
-			if !raw {
-				line = lib.ReplaceControlCodes(line)
-			}
-
-			err = connection.SendLine(line)
-			if err != nil {
-				log.Println("** ircdog error: failed to send line:", err.Error())
-				return
-			}
-			transcript.WriteLine(line, true)
-		}
-	}()
-
 	if script != "" {
 		if scriptCommands, err := lib.ReadScript(script); err == nil {
 			for _, command := range scriptCommands {
@@ -418,8 +446,37 @@ func connectExternal(
 		}
 	}
 
-	<-doneChan
-	return 0
+	// process incoming lines from user
+	for {
+		select {
+		case line, ok := <-lineChan:
+			if !ok {
+				// no more stdin, assume the user sent EOF and wants ircdog to stop
+				// (this conflates EOF with real errors but it shouldn't matter)
+				status = 0
+				return
+			}
+			line = strings.TrimRight(line, "\r\n")
+			if parsedLine, err := ircmsg.ParseLine(line); err == nil && parsedLine.Command == "QUIT" {
+				// user-initiated QUIT, ircdog should stop
+				status = 0
+			}
+
+			if !raw {
+				line = lib.ReplaceControlCodes(line)
+			}
+
+			err = connection.SendLine(line)
+			if err != nil {
+				log.Println("** ircdog error: failed to send line:", err.Error())
+				return
+			}
+			transcript.WriteLine(line, true)
+
+		case <-doneChan:
+			return
+		}
+	}
 }
 
 func makePong(msg ircmsg.Message) string {
@@ -449,7 +506,7 @@ type listenConnectionManager struct {
 	activeConnection atomic.Uint64
 }
 
-func listenAndConnectExternal(
+func runListenProxy(
 	listenAddress string, connectionConfig lib.ConnectionConfig,
 	hiddenCommands map[string]bool, transcript *lib.Transcript,
 	raw, escape, useItalics bool, colorLevel lib.ColorLevel) int {
