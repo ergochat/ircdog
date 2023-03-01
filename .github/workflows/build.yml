@@ -24,3 +24,5 @@ jobs:
         run: "make build"
       - name: "make build (windows)"
         run: "GOOS=windows make build"
+      - name: "make minimal"
+        run: "make minimal"
