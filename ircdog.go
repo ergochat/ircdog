@@ -24,7 +24,7 @@ import (
 	"github.com/ergochat/irc-go/ircfmt"
 	"github.com/ergochat/irc-go/ircmsg"
 
-	"github.com/ergochat/ircdog/console"
+	libconsole "github.com/ergochat/ircdog/console"
 	"github.com/ergochat/ircdog/lib"
 )
 
@@ -317,7 +317,7 @@ func runClient(
 	hiddenCommands map[string]bool, transcript *lib.Transcript,
 	raw, escape, answerPings, useItalics bool, colorLevel lib.ColorLevel,
 	verbose, disableReadline bool, script string, reconnectDuration time.Duration) int {
-	console, err := console.NewConsole(!(raw || disableReadline), os.Getenv("IRCDOG_HISTFILE"))
+	console, err := libconsole.NewConsole(!(raw || disableReadline), os.Getenv("IRCDOG_HISTFILE"))
 	if err != nil {
 		log.Printf("** ircdog could not initialize console: %s\n", err.Error())
 		return 1
@@ -357,7 +357,7 @@ func runClient(
 }
 
 func connectExternal(
-	console console.Console, lineChan chan string, connectionConfig lib.ConnectionConfig,
+	console libconsole.Console, lineChan chan string, connectionConfig lib.ConnectionConfig,
 	hiddenCommands map[string]bool, transcript *lib.Transcript,
 	raw, escape, answerPings, useItalics bool, colorLevel lib.ColorLevel,
 	verbose bool, script string) (status int) {
