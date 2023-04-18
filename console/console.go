@@ -1,13 +1,15 @@
 // Copyright (c) 2023 Shivaram Lingamneni <slingamn@cs.stanford.edu>
 // released under the ISC license
 
-package lib
+package console
 
 import (
 	"io"
 	"os"
 
 	"github.com/ergochat/irc-go/ircreader"
+
+	"github.com/ergochat/ircdog/lib"
 )
 
 // Console is an abstract representation of keyboard input and screen output
@@ -26,7 +28,7 @@ type stdioConsole struct {
 
 func NewStandardConsole() (Console, error) {
 	result := new(stdioConsole)
-	result.reader.Initialize(os.Stdin, InitialBufferSize, MaxBufferSize)
+	result.reader.Initialize(os.Stdin, lib.InitialBufferSize, lib.MaxBufferSize)
 	return result, nil
 }
 

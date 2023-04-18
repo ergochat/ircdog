@@ -24,8 +24,8 @@ import (
 	"github.com/ergochat/irc-go/ircfmt"
 	"github.com/ergochat/irc-go/ircmsg"
 
+	libconsole "github.com/ergochat/ircdog/console"
 	"github.com/ergochat/ircdog/lib"
-	"github.com/ergochat/ircdog/readline"
 )
 
 // set via linker flags, either by make or by goreleaser:
@@ -79,7 +79,7 @@ Options:
 	                      https://pkg.go.dev/github.com/goshuirc/irc-go/ircfmt
 	--italics             Enable ANSI italics codes (not widely supported).
 	--color=<mode>        Override detected color support ('none', '16', '256').
-	--readline            Enable experimental readline support.
+	--no-readline         Disable readline support.
 	--script=<file>       Read an initial list of commands to send from a file.
 	--reconnect=<time>    If disconnected unexpectedly, reconnect after a pause
 	                      ('30' for 30 seconds, '5m' for 5 minutes, etc.)
@@ -274,13 +274,7 @@ func main() {
 	colorLevel := determineColorLevel(arguments["--color"])
 
 	verbose := arguments["--verbose"].(bool)
-	enableReadline := arguments["--readline"].(bool)
-	if raw && enableReadline {
-		log.Fatal("Cannot enable readline support with --raw")
-	}
-	if !raw && os.Getenv("IRCDOG_READLINE") == "1" {
-		enableReadline = true
-	}
+	disableReadline := arguments["--no-readline"].(bool) || os.Getenv("IRCDOG_READLINE") == "0"
 
 	var transcript *lib.Transcript
 	if transcriptFile := arguments["--transcript"]; transcriptFile != nil {
@@ -307,7 +301,7 @@ func main() {
 		exitStatus = runClient(
 			connectionConfig, hiddenCommands, transcript,
 			raw, escape, answerPings, useItalics, colorLevel,
-			verbose, enableReadline, script, reconnectDuration,
+			verbose, disableReadline, script, reconnectDuration,
 		)
 	} else {
 		exitStatus = runListenProxy(
@@ -322,14 +316,8 @@ func runClient(
 	connectionConfig lib.ConnectionConfig,
 	hiddenCommands map[string]bool, transcript *lib.Transcript,
 	raw, escape, answerPings, useItalics bool, colorLevel lib.ColorLevel,
-	verbose, enableReadline bool, script string, reconnectDuration time.Duration) int {
-	var console lib.Console
-	var err error
-	if !raw && enableReadline {
-		console, err = readline.NewReadline(os.Getenv("IRCDOG_HISTFILE"))
-	} else {
-		console, err = lib.NewStandardConsole()
-	}
+	verbose, disableReadline bool, script string, reconnectDuration time.Duration) int {
+	console, err := libconsole.NewConsole(!(raw || disableReadline))
 	if err != nil {
 		log.Printf("** ircdog could not initialize console: %s\n", err.Error())
 		return 1
@@ -369,7 +357,7 @@ func runClient(
 }
 
 func connectExternal(
-	console lib.Console, lineChan chan string, connectionConfig lib.ConnectionConfig,
+	console libconsole.Console, lineChan chan string, connectionConfig lib.ConnectionConfig,
 	hiddenCommands map[string]bool, transcript *lib.Transcript,
 	raw, escape, answerPings, useItalics bool, colorLevel lib.ColorLevel,
 	verbose bool, script string) (status int) {
