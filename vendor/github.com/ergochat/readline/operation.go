@@ -14,30 +14,27 @@ var (
 	ErrInterrupt = errors.New("Interrupt")
 )
 
-type Operation struct {
+type operation struct {
 	m       sync.Mutex
-	cfg     *Config
-	t       *Terminal
-	buf     *RuneBuffer
-	w       io.Writer
+	t       *terminal
+	buf     *runeBuffer
 	wrapOut atomic.Pointer[wrapWriter]
 	wrapErr atomic.Pointer[wrapWriter]
 
-	isPrompting bool       // true when prompt written and waiting for input
+	isPrompting bool // true when prompt written and waiting for input
 
-	history *opHistory
-	search  *opSearch
+	history   *opHistory
+	search    *opSearch
 	completer *opCompleter
-	password *opPassword
-	vim *opVim
+	vim       *opVim
 }
 
-func (o *Operation) SetBuffer(what string) {
-	o.buf.Set([]rune(what))
+func (o *operation) SetBuffer(what string) {
+	o.buf.SetNoRefresh([]rune(what))
 }
 
 type wrapWriter struct {
-	o      *Operation
+	o      *operation
 	target io.Writer
 }
 
@@ -45,7 +42,7 @@ func (w *wrapWriter) Write(b []byte) (int, error) {
 	return w.o.write(w.target, b)
 }
 
-func (o *Operation) write(target io.Writer, b []byte) (int, error) {
+func (o *operation) write(target io.Writer, b []byte) (int, error) {
 	o.m.Lock()
 	defer o.m.Unlock()
 
@@ -79,36 +76,24 @@ func (o *Operation) write(target io.Writer, b []byte) (int, error) {
 	return n, err
 }
 
-func NewOperation(t *Terminal, cfg *Config) *Operation {
-	op := &Operation{
-		t:       t,
-		buf:     NewRuneBuffer(t, cfg.Prompt, cfg),
+func newOperation(t *terminal) *operation {
+	cfg := t.GetConfig()
+	op := &operation{
+		t:   t,
+		buf: newRuneBuffer(t),
 	}
-	op.w = op.buf.w
 	op.SetConfig(cfg)
 	op.vim = newVimMode(op)
 	op.completer = newOpCompleter(op.buf.w, op)
-	op.password = newOpPassword(op)
-	op.cfg.FuncOnWidthChanged(t.OnSizeChange)
+	cfg.FuncOnWidthChanged(t.OnSizeChange)
 	return op
 }
 
-func (o *Operation) SetPrompt(s string) {
-	o.buf.SetPrompt(s)
+func (o *operation) GetConfig() *Config {
+	return o.t.GetConfig()
 }
 
-func (o *Operation) SetMaskRune(r rune) {
-	o.buf.SetMask(r)
-}
-
-func (o *Operation) GetConfig() *Config {
-	o.m.Lock()
-	cfg := *o.cfg
-	o.m.Unlock()
-	return &cfg
-}
-
-func (o *Operation) readline(deadline chan struct{}) ([]rune, error) {
+func (o *operation) readline(deadline chan struct{}) ([]rune, error) {
 	for {
 		keepInSearchMode := false
 		keepInCompleteMode := false
@@ -252,8 +237,8 @@ func (o *Operation) readline(deadline chan struct{}) ([]rune, error) {
 				o.Refresh()
 			}
 		case CharCtrlL:
-			platform.ClearScreen(o.w)
-			o.buf.SetOffset(cursorPosition{1,1})
+			platform.ClearScreen(o.t)
+			o.buf.SetOffset(cursorPosition{1, 1})
 			o.Refresh()
 		case MetaBackspace, CharCtrlW:
 			o.buf.BackEscapeWord()
@@ -304,15 +289,18 @@ func (o *Operation) readline(deadline chan struct{}) ([]rune, error) {
 			} else {
 				o.t.Bell()
 			}
-		case CharDelete:
+		case MetaDeleteKey, CharEOT:
+			// on Delete key or Ctrl-D, attempt to delete a character:
 			if o.buf.Len() > 0 || !o.IsNormalMode() {
 				if !o.buf.Delete() {
 					o.t.Bell()
 				}
 				break
 			}
-
-			// treat as EOF
+			if r != CharEOT {
+				break
+			}
+			// Ctrl-D on an empty buffer: treated as EOF
 			if !o.GetConfig().UniqueEditLine {
 				o.buf.WriteString(o.GetConfig().EOFPrompt + "\n")
 			}
@@ -396,20 +384,20 @@ func (o *Operation) readline(deadline chan struct{}) ([]rune, error) {
 	}
 }
 
-func (o *Operation) Stderr() io.Writer {
+func (o *operation) Stderr() io.Writer {
 	return o.wrapErr.Load()
 }
 
-func (o *Operation) Stdout() io.Writer {
+func (o *operation) Stdout() io.Writer {
 	return o.wrapOut.Load()
 }
 
-func (o *Operation) String() (string, error) {
+func (o *operation) String() (string, error) {
 	r, err := o.Runes()
 	return string(r), err
 }
 
-func (o *Operation) Runes() ([]rune, error) {
+func (o *operation) Runes() ([]rune, error) {
 	o.t.EnterRawMode()
 	defer o.t.ExitRawMode()
 
@@ -434,16 +422,15 @@ func (o *Operation) Runes() ([]rune, error) {
 	defer func() {
 		o.m.Lock()
 		o.isPrompting = false
-		o.buf.SetOffset(cursorPosition{1,1})
+		o.buf.SetOffset(cursorPosition{1, 1})
 		o.m.Unlock()
 	}()
 
 	return o.readline(nil)
 }
 
-func (o *Operation) getAndSetOffset(deadline chan struct{}) {
-	// TODO(#7) cache the `interactive` status in Config itself
-	if !o.buf.interactive {
+func (o *operation) getAndSetOffset(deadline chan struct{}) {
+	if !o.GetConfig().isInteractive {
 		return
 	}
 
@@ -461,29 +448,48 @@ func (o *Operation) getAndSetOffset(deadline chan struct{}) {
 	}
 }
 
-func (o *Operation) GenPasswordConfig() *Config {
-	return o.password.PasswordConfig()
+func (o *operation) GenPasswordConfig() *Config {
+	baseConfig := o.GetConfig()
+	return &Config{
+		EnableMask:      true,
+		InterruptPrompt: "\n",
+		EOFPrompt:       "\n",
+		HistoryLimit:    -1,
+
+		Stdin:  baseConfig.Stdin,
+		Stdout: baseConfig.Stdout,
+		Stderr: baseConfig.Stderr,
+
+		FuncIsTerminal:      baseConfig.FuncIsTerminal,
+		FuncMakeRaw:         baseConfig.FuncMakeRaw,
+		FuncExitRaw:         baseConfig.FuncExitRaw,
+		FuncOnWidthChanged:  baseConfig.FuncOnWidthChanged,
+		ForceUseInteractive: baseConfig.ForceUseInteractive,
+	}
 }
 
-func (o *Operation) PasswordWithConfig(cfg *Config) ([]byte, error) {
-	if err := o.password.EnterPasswordMode(cfg); err != nil {
+func (o *operation) PasswordWithConfig(cfg *Config) ([]byte, error) {
+	backupCfg, err := o.SetConfig(cfg)
+	if err != nil {
 		return nil, err
 	}
-	defer o.password.ExitPasswordMode()
+	defer func() {
+		o.SetConfig(backupCfg)
+	}()
 	return o.Slice()
 }
 
-func (o *Operation) Password(prompt string) ([]byte, error) {
+func (o *operation) Password(prompt string) ([]byte, error) {
 	cfg := o.GenPasswordConfig()
 	cfg.Prompt = prompt
 	return o.PasswordWithConfig(cfg)
 }
 
-func (o *Operation) SetTitle(t string) {
-	o.w.Write([]byte("\033[2;" + t + "\007"))
+func (o *operation) SetTitle(t string) {
+	o.t.Write([]byte("\033[2;" + t + "\007"))
 }
 
-func (o *Operation) Slice() ([]byte, error) {
+func (o *operation) Slice() ([]byte, error) {
 	r, err := o.Runes()
 	if err != nil {
 		return nil, err
@@ -491,82 +497,65 @@ func (o *Operation) Slice() ([]byte, error) {
 	return []byte(string(r)), nil
 }
 
-func (o *Operation) Close() {
+func (o *operation) Close() {
 	o.history.Close()
 }
 
-func (o *Operation) SetHistoryPath(path string) {
-	if o.history != nil {
-		o.history.Close()
-	}
-	o.cfg.HistoryFile = path
-	o.history = newOpHistory(o.cfg)
-}
-
-func (o *Operation) IsNormalMode() bool {
+func (o *operation) IsNormalMode() bool {
 	return !o.completer.IsInCompleteMode() && !o.search.IsSearchMode()
 }
 
-func (op *Operation) SetConfig(cfg *Config) (*Config, error) {
+func (op *operation) SetConfig(cfg *Config) (*Config, error) {
 	op.m.Lock()
 	defer op.m.Unlock()
-	if op.cfg == cfg {
-		return op.cfg, nil
+	old := op.t.GetConfig()
+	if err := cfg.init(); err != nil {
+		return old, err
 	}
-	if err := cfg.Init(); err != nil {
-		return op.cfg, err
-	}
-	old := op.cfg
-	op.cfg = cfg
-	op.SetPrompt(cfg.Prompt)
-	op.SetMaskRune(cfg.MaskRune)
-	op.buf.SetConfig(cfg)
+
+	// install the config in its canonical location (inside terminal):
+	op.t.SetConfig(cfg)
 
 	op.wrapOut.Store(&wrapWriter{target: cfg.Stdout, o: op})
 	op.wrapErr.Store(&wrapWriter{target: cfg.Stderr, o: op})
 
-	if cfg.opHistory == nil {
-		op.SetHistoryPath(cfg.HistoryFile)
-		cfg.opHistory = op.history
-		cfg.opSearch = newOpSearch(op.buf.w, op.buf, op.history, cfg)
+	if op.history == nil {
+		op.history = newOpHistory(op)
 	}
-	op.history = cfg.opHistory
+	if op.search == nil {
+		op.search = newOpSearch(op.buf.w, op.buf, op.history)
+	}
 
-	// SetHistoryPath will close opHistory which already exists
-	// so if we use it next time, we need to reopen it by `InitHistory()`
-	op.history.Init()
-
-	if op.cfg.AutoComplete != nil && op.completer == nil {
+	if cfg.AutoComplete != nil && op.completer == nil {
 		op.completer = newOpCompleter(op.buf.w, op)
 	}
 
-	op.search = cfg.opSearch
 	return old, nil
 }
 
-func (o *Operation) ResetHistory() {
+func (o *operation) ResetHistory() {
 	o.history.Reset()
 }
 
 // if err is not nil, it just mean it fail to write to file
 // other things goes fine.
-func (o *Operation) SaveHistory(content string) error {
+func (o *operation) SaveHistory(content string) error {
 	return o.history.New([]rune(content))
 }
 
-func (o *Operation) Refresh() {
+func (o *operation) Refresh() {
 	o.m.Lock()
 	defer o.m.Unlock()
 	o.refresh()
 }
 
-func (o *Operation) refresh() {
+func (o *operation) refresh() {
 	if o.isPrompting {
 		o.buf.Refresh(nil)
 	}
 }
 
-func (o *Operation) Clean() {
+func (o *operation) Clean() {
 	o.buf.Clean()
 }
 

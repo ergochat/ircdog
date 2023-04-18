@@ -32,16 +32,16 @@ var (
 )
 
 /*
-Terminal manages terminal input. The design constraints here are somewhat complex:
+terminal manages terminal input. The design constraints here are somewhat complex:
 
 1. Calls to (*Instance).Readline() must always be preemptible by (*Instance).Close.
    This could be handled at the Operation layer instead; however, it's cleaner
-   to provide an API in Terminal itself that can interrupt attempts to read.
+   to provide an API in terminal itself that can interrupt attempts to read.
 2. In between calls to Readline(), or *after* a call to (*Instance).Close(),
    stdin must be available for code outside of this library to read from. The
    problem is that reads from stdin in Go are not preemptible (see, for example,
    https://github.com/golang/go/issues/24842 ). In the worst case, an
-   interrupted read will leave (*Terminal).ioloop() running, and it will
+   interrupted read will leave (*terminal).ioloop() running, and it will
    consume one more user keystroke before it exits. However, it is a design goal
    to read as little as possible at a time.
 3. We have to handle the DSR ("device status report") query and the
@@ -73,7 +73,7 @@ Accordingly, the concurrency design is as follows:
    has been received. It is idempotent and can be called multiple times.
 */
 
-type Terminal struct {
+type terminal struct {
 	cfg        atomic.Pointer[Config]
 	dimensions atomic.Pointer[termDimensions]
 	closeOnce  sync.Once
@@ -103,7 +103,7 @@ type cursorPosition struct {
 }
 
 // readResult represents the result of a single "read operation" from the
-// perspective of Terminal. it may be a pure no-op. the consumer needs to
+// perspective of terminal. it may be a pure no-op. the consumer needs to
 // read again if it didn't get what it wanted
 type readResult struct {
 	r  rune
@@ -113,18 +113,18 @@ type readResult struct {
 	pos *cursorPosition
 }
 
-func NewTerminal(cfg *Config) (*Terminal, error) {
-	if cfg.useInteractive() {
+func newTerminal(cfg *Config) (*terminal, error) {
+	if cfg.isInteractive {
 		if ansiErr := ansi.EnableANSI(); ansiErr != nil {
 			return nil, fmt.Errorf("Could not enable ANSI escapes: %w", ansiErr)
 		}
 	}
-	t := &Terminal{
+	t := &terminal{
 		kickChan: make(chan struct{}),
 		outChan:  make(chan readResult),
 		stopChan: make(chan struct{}),
 	}
-	t.cfg.Store(cfg)
+	t.SetConfig(cfg)
 	// Get and cache the current terminal size.
 	t.OnSizeChange()
 
@@ -133,7 +133,7 @@ func NewTerminal(cfg *Config) (*Terminal, error) {
 }
 
 // SleepToResume will sleep myself, and return only if I'm resumed.
-func (t *Terminal) SleepToResume() {
+func (t *terminal) SleepToResume() {
 	if !atomic.CompareAndSwapInt32(&t.sleeping, 0, 1) {
 		return
 	}
@@ -144,21 +144,21 @@ func (t *Terminal) SleepToResume() {
 	t.EnterRawMode()
 }
 
-func (t *Terminal) EnterRawMode() (err error) {
-	return t.cfg.Load().FuncMakeRaw()
+func (t *terminal) EnterRawMode() (err error) {
+	return t.GetConfig().FuncMakeRaw()
 }
 
-func (t *Terminal) ExitRawMode() (err error) {
-	return t.cfg.Load().FuncExitRaw()
+func (t *terminal) ExitRawMode() (err error) {
+	return t.GetConfig().FuncExitRaw()
 }
 
-func (t *Terminal) Write(b []byte) (int, error) {
-	return t.cfg.Load().Stdout.Write(b)
+func (t *terminal) Write(b []byte) (int, error) {
+	return t.GetConfig().Stdout.Write(b)
 }
 
 // getOffset sends a DSR query to get the current offset, then blocks
 // until the query returns.
-func (t *Terminal) GetCursorPosition(deadline chan struct{}) (cursorPosition, error) {
+func (t *terminal) GetCursorPosition(deadline chan struct{}) (cursorPosition, error) {
 	// ensure there is no in-flight query, set up a waiter
 	ok := func() (ok bool) {
 		t.dsrLock.Lock()
@@ -209,7 +209,7 @@ func (t *Terminal) GetCursorPosition(deadline chan struct{}) (cursorPosition, er
 // waitForDSR waits for any in-flight DSR query to complete. this prevents
 // garbage from being written to the terminal when Close() interrupts an
 // in-flight query.
-func (t *Terminal) waitForDSR() {
+func (t *terminal) waitForDSR() {
 	t.dsrLock.Lock()
 	dsrDone := t.dsrDone
 	t.dsrLock.Unlock()
@@ -226,7 +226,7 @@ func (t *Terminal) waitForDSR() {
 	}
 }
 
-func (t *Terminal) GetRune(deadline chan struct{}) (rune, error) {
+func (t *terminal) GetRune(deadline chan struct{}) (rune, error) {
 	if len(t.buffer) > 0 {
 		result := t.buffer[0]
 		t.buffer = t.buffer[1:]
@@ -235,7 +235,7 @@ func (t *Terminal) GetRune(deadline chan struct{}) (rune, error) {
 	return t.getRuneFromStdin(deadline)
 }
 
-func (t *Terminal) getRuneFromStdin(deadline chan struct{}) (rune, error) {
+func (t *terminal) getRuneFromStdin(deadline chan struct{}) (rune, error) {
 	for {
 		result, err := t.readFromStdin(deadline)
 		if err != nil {
@@ -246,7 +246,7 @@ func (t *Terminal) getRuneFromStdin(deadline chan struct{}) (rune, error) {
 	}
 }
 
-func (t *Terminal) readFromStdin(deadline chan struct{}) (result readResult, err error) {
+func (t *terminal) readFromStdin(deadline chan struct{}) (result readResult, err error) {
 	// we may have sent a kick previously and given up on the response;
 	// if so, don't kick again (we will try again to read the pending response)
 	if !t.inFlight {
@@ -271,11 +271,11 @@ func (t *Terminal) readFromStdin(deadline chan struct{}) (result readResult, err
 	}
 }
 
-func (t *Terminal) ioloop() {
+func (t *terminal) ioloop() {
 	// ensure close if we get an error from stdio
 	defer t.Close()
 
-	buf := bufio.NewReader(t.cfg.Load().Stdin)
+	buf := bufio.NewReader(t.GetConfig().Stdin)
 
 	for {
 		select {
@@ -309,7 +309,7 @@ func (t *Terminal) ioloop() {
 	}
 }
 
-func (t *Terminal) consumeANSIEscape(buf *bufio.Reader) (result readResult, err error) {
+func (t *terminal) consumeANSIEscape(buf *bufio.Reader) (result readResult, err error) {
 	// initial character is either [ or O; if we got something else,
 	// treat the sequence as terminated and don't interpret it
 	initial, _, err := buf.ReadRune()
@@ -358,7 +358,7 @@ func (t *Terminal) consumeANSIEscape(buf *bufio.Reader) (result readResult, err 
 		r = CharLineEnd
 	case '~':
 		if initial == '[' && data == "3" {
-			r = CharDelete // ???
+			r = MetaDeleteKey // this is the key typically labeled "Delete"
 		}
 	case 'Z':
 		if initial == '[' {
@@ -383,11 +383,11 @@ func parseCPRResponse(payload string) (cursorPosition, error) {
 	return cursorPosition{-1, -1}, invalidCPR
 }
 
-func (t *Terminal) Bell() {
+func (t *terminal) Bell() {
 	t.Write([]byte{CharBell})
 }
 
-func (t *Terminal) Close() error {
+func (t *terminal) Close() error {
 	t.closeOnce.Do(func() {
 		t.waitForDSR()
 		close(t.stopChan)
@@ -398,14 +398,18 @@ func (t *Terminal) Close() error {
 	return t.closeErr
 }
 
-func (t *Terminal) SetConfig(c *Config) error {
+func (t *terminal) SetConfig(c *Config) error {
 	t.cfg.Store(c)
 	return nil
 }
 
+func (t *terminal) GetConfig() *Config {
+	return t.cfg.Load()
+}
+
 // OnSizeChange gets the current terminal size and caches it
-func (t *Terminal) OnSizeChange() {
-	cfg := t.cfg.Load()
+func (t *terminal) OnSizeChange() {
+	cfg := t.GetConfig()
 	width, height := cfg.FuncGetSize()
 	t.dimensions.Store(&termDimensions{
 		width:  width,
@@ -414,7 +418,7 @@ func (t *Terminal) OnSizeChange() {
 }
 
 // GetWidthHeight returns the cached width, height values from the terminal
-func (t *Terminal) GetWidthHeight() (width, height int) {
+func (t *terminal) GetWidthHeight() (width, height int) {
 	dimensions := t.dimensions.Load()
 	return dimensions.width, dimensions.height
 }
