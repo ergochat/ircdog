@@ -325,6 +325,7 @@ func runClient(
 	defer console.Close()
 	lineChan := make(chan string)
 	go func() {
+		<-lineChan // wait to show the prompt until connection established
 		for {
 			line, err := console.Readline()
 			if err == nil {
@@ -374,6 +375,7 @@ func connectExternal(
 		log.Printf("** ircdog connected to remote host at %s", connection.RemoteAddr().String())
 	}
 	defer connection.Disconnect()
+	lineChan <- "" // connection established, we can now call Readline()
 
 	doneChan := make(chan struct{})
 
