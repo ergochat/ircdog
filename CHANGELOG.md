@@ -3,6 +3,13 @@ All notable changes to ircdog will be documented in this file.
 
 This project adheres to [Semantic Versioning](http://semver.org/). For the purposes of versioning, we consider the "public API" to refer to the configuration files and CLI.
 
+## [0.5.0] - 2023-06-04
+ircdog v0.5.0 is a new release with fixes and enhancements:
+
+* Readline support is now enabled by default. To disable, use `--no-readline` or `--raw`, or set the environment variable `IRCDOG_READLINE=0`
+* Added the `--script=<file>` argument, which reads an initial list of commands to send from a file
+* Added the `--reconnect=<time>` argument, which enables automatic reconnection on disconnections not caused by the QUIT command or Ctrl-D. The time argument specifies a delay between reconnection attempts.
+
 ## [0.4.0] - 2023-02-19
 ircdog v0.4.0 is a new release with fixes and enhancements:
 
