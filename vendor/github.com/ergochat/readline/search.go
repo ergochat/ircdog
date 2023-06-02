@@ -4,22 +4,28 @@ import (
 	"bytes"
 	"container/list"
 	"fmt"
+	"sync"
 )
 
-const (
-	S_STATE_FOUND = iota
-	S_STATE_FAILING
-)
+type searchState uint
 
 const (
-	S_DIR_BCK = iota
-	S_DIR_FWD
+	searchStateFound searchState = iota
+	searchStateFailing
+)
+
+type searchDirection uint
+
+const (
+	searchDirectionForward searchDirection = iota
+	searchDirectionBackward
 )
 
 type opSearch struct {
+	mutex     sync.Mutex
 	inMode    bool
-	state     int
-	dir       int
+	state     searchState
+	dir       searchDirection
 	source    *list.Element
 	w         *terminal
 	buf       *runeBuffer
@@ -38,10 +44,14 @@ func newOpSearch(w *terminal, buf *runeBuffer, history *opHistory) *opSearch {
 }
 
 func (o *opSearch) IsSearchMode() bool {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
 	return o.inMode
 }
 
 func (o *opSearch) SearchBackspace() {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
 	if len(o.data) > 0 {
 		o.data = o.data[:len(o.data)-1]
 		o.search(true)
@@ -49,7 +59,7 @@ func (o *opSearch) SearchBackspace() {
 }
 
 func (o *opSearch) findHistoryBy(isNewSearch bool) (int, *list.Element) {
-	if o.dir == S_DIR_BCK {
+	if o.dir == searchDirectionBackward {
 		return o.history.FindBck(isNewSearch, o.data, o.buf.idx)
 	}
 	return o.history.FindFwd(isNewSearch, o.data, o.buf.idx)
@@ -57,20 +67,20 @@ func (o *opSearch) findHistoryBy(isNewSearch bool) (int, *list.Element) {
 
 func (o *opSearch) search(isChange bool) bool {
 	if len(o.data) == 0 {
-		o.state = S_STATE_FOUND
-		o.SearchRefresh(-1)
+		o.state = searchStateFound
+		o.searchRefresh(-1)
 		return true
 	}
 	idx, elem := o.findHistoryBy(isChange)
 	if elem == nil {
-		o.SearchRefresh(-2)
+		o.searchRefresh(-2)
 		return false
 	}
 	o.history.current = elem
 
 	item := o.history.showItem(o.history.current.Value)
 	start, end := 0, 0
-	if o.dir == S_DIR_BCK {
+	if o.dir == searchDirectionBackward {
 		start, end = idx, idx+len(o.data)
 	} else {
 		start, end = idx, idx+len(o.data)
@@ -78,16 +88,22 @@ func (o *opSearch) search(isChange bool) bool {
 	}
 	o.buf.SetWithIdx(idx, item)
 	o.markStart, o.markEnd = start, end
-	o.SearchRefresh(idx)
+	o.searchRefresh(idx)
 	return true
 }
 
 func (o *opSearch) SearchChar(r rune) {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
 	o.data = append(o.data, r)
 	o.search(true)
 }
 
-func (o *opSearch) SearchMode(dir int) bool {
+func (o *opSearch) SearchMode(dir searchDirection) bool {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
 	tWidth, _ := o.w.GetWidthHeight()
 	if tWidth == 0 {
 		return false
@@ -99,29 +115,36 @@ func (o *opSearch) SearchMode(dir int) bool {
 	if alreadyInMode {
 		o.search(false)
 	} else {
-		o.SearchRefresh(-1)
+		o.searchRefresh(-1)
 	}
 	return true
 }
 
 func (o *opSearch) ExitSearchMode(revert bool) {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
 	if revert {
 		o.history.current = o.source
-		o.buf.Set(o.history.showItem(o.history.current.Value))
+		var redrawValue []rune
+		if o.history.current != nil {
+			redrawValue = o.history.showItem(o.history.current.Value)
+		}
+		o.buf.Set(redrawValue)
 	}
 	o.markStart, o.markEnd = 0, 0
-	o.state = S_STATE_FOUND
+	o.state = searchStateFound
 	o.inMode = false
 	o.source = nil
 	o.data = nil
 }
 
-func (o *opSearch) SearchRefresh(x int) {
+func (o *opSearch) searchRefresh(x int) {
 	tWidth, _ := o.w.GetWidthHeight()
 	if x == -2 {
-		o.state = S_STATE_FAILING
+		o.state = searchStateFailing
 	} else if x >= 0 {
-		o.state = S_STATE_FOUND
+		o.state = searchStateFound
 	}
 	if x < 0 {
 		x = o.buf.idx
@@ -138,12 +161,12 @@ func (o *opSearch) SearchRefresh(x int) {
 	buf := bytes.NewBuffer(nil)
 	buf.Write(bytes.Repeat([]byte("\n"), lineCnt))
 	buf.WriteString("\033[J")
-	if o.state == S_STATE_FAILING {
+	if o.state == searchStateFailing {
 		buf.WriteString("failing ")
 	}
-	if o.dir == S_DIR_BCK {
+	if o.dir == searchDirectionBackward {
 		buf.WriteString("bck")
-	} else if o.dir == S_DIR_FWD {
+	} else if o.dir == searchDirectionForward {
 		buf.WriteString("fwd")
 	}
 	buf.WriteString("-i-search: ")
@@ -154,4 +177,13 @@ func (o *opSearch) SearchRefresh(x int) {
 		fmt.Fprintf(buf, "\033[%dC", x) // move forward
 	}
 	o.w.Write(buf.Bytes())
+}
+
+func (o *opSearch) RefreshIfNeeded() {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	if o.inMode {
+		o.searchRefresh(-1)
+	}
 }
