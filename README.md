@@ -8,6 +8,7 @@
 * Can run as an intercepting proxy between another client and the server
 * Can produce a transcript of raw traffic
 * Supports escape sequences to easily send arbitrary binary data (`--raw` disables)
+* Supports scripted connection initiation and automatic reconnection
 * Supports TLS client certificates
 
 ircdog is primarily intended for IRC protocol developers who need to debug client or server behavior.
