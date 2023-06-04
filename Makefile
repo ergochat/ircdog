@@ -19,7 +19,7 @@ install:
 	go install -v -ldflags "-X main.commit=$(GIT_COMMIT) -X main.version=$(GIT_TAG)"
 
 release:
-	goreleaser --skip-publish --rm-dist
+	goreleaser --skip-publish --clean
 
 test:
 	cd lib && go test . && go vet .
