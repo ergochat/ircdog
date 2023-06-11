@@ -3,6 +3,11 @@ All notable changes to ircdog will be documented in this file.
 
 This project adheres to [Semantic Versioning](http://semver.org/). For the purposes of versioning, we consider the "public API" to refer to the configuration files and CLI.
 
+## [0.5.1] - 2023-06-11
+ircdog v0.5.1 fixes a bug in the new (v0.5.0) `--reconnect` feature. We apologize for the oversight.
+
+* Fixed deadlock during `--reconnect` (#45)
+
 ## [0.5.0] - 2023-06-04
 ircdog v0.5.0 is a new release with fixes and enhancements:
 
