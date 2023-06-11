@@ -324,8 +324,9 @@ func runClient(
 	}
 	defer console.Close()
 	lineChan := make(chan string)
+	openChan := make(chan struct{})
 	go func() {
-		<-lineChan // wait to show the prompt until connection established
+		<-openChan // wait to show the prompt until connection established
 		for {
 			line, err := console.Readline()
 			if err == nil {
@@ -342,7 +343,7 @@ func runClient(
 
 	for {
 		status := connectExternal(
-			console, lineChan, connectionConfig, hiddenCommands, transcript,
+			console, lineChan, openChan, connectionConfig, hiddenCommands, transcript,
 			raw, escape, answerPings, useItalics, colorLevel,
 			verbose, script,
 		)
@@ -353,13 +354,14 @@ func runClient(
 		} else {
 			log.Printf("** ircdog disconnected unexpectedly, waiting %v to reconnect", reconnectDuration)
 			time.Sleep(reconnectDuration)
+			openChan = nil // we are already prompting
 		}
 	}
 }
 
 func connectExternal(
-	console libconsole.Console, lineChan chan string, connectionConfig lib.ConnectionConfig,
-	hiddenCommands map[string]bool, transcript *lib.Transcript,
+	console libconsole.Console, lineChan chan string, openChan chan struct{},
+	connectionConfig lib.ConnectionConfig, hiddenCommands map[string]bool, transcript *lib.Transcript,
 	raw, escape, answerPings, useItalics bool, colorLevel lib.ColorLevel,
 	verbose bool, script string) (status int) {
 	status = 1
@@ -375,7 +377,9 @@ func connectExternal(
 		log.Printf("** ircdog connected to remote host at %s", connection.RemoteAddr().String())
 	}
 	defer connection.Disconnect()
-	lineChan <- "" // connection established, we can now call Readline()
+	if openChan != nil {
+		close(openChan) // connection established, show the prompt
+	}
 
 	doneChan := make(chan struct{})
 

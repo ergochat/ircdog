@@ -22,8 +22,8 @@ release:
 	goreleaser --skip-publish --clean
 
 test:
-	cd lib && go test . && go vet .
-	go vet ircdog.go
+	go test ./...
+	go vet ./...
 	./.check-gofmt.sh
 
 gofmt:
