@@ -8,7 +8,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ergochat/readline/internal/platform"
 	"github.com/ergochat/readline/internal/runes"
 )
 
@@ -393,9 +392,6 @@ func (r *runeBuffer) MoveTo(ch rune, prevChar, reverse bool) (success bool) {
 }
 
 func (r *runeBuffer) isInLineEdge() bool {
-	if platform.IsWindows {
-		return false
-	}
 	sp := r.getSplitByLine(r.buf, 1)
 	return len(sp[len(sp)-1]) == 0 // last line is 0 len
 }
@@ -523,6 +519,7 @@ func (r *runeBuffer) print() {
 func (r *runeBuffer) output() []byte {
 	buf := bytes.NewBuffer(nil)
 	buf.WriteString(r.prompt())
+	buf.WriteString("\x1b[0K") // VT100 "Clear line from cursor right", see #38
 	cfg := r.getConfig()
 	if cfg.EnableMask && len(r.buf) > 0 {
 		if cfg.MaskRune != 0 {
@@ -588,6 +585,19 @@ func (r *runeBuffer) getBackspaceSequence() []byte {
 	fmt.Fprintf(buf, "\033[%dG", column) // move cursor to column
 
 	return buf.Bytes()
+}
+
+func (r *runeBuffer) CopyForUndo(prev []rune) (cur []rune, idx int, changed bool) {
+	if runes.Equal(r.buf, prev) {
+		return prev, r.idx, false
+	} else {
+		return runes.Copy(r.buf), r.idx, true
+	}
+}
+
+func (r *runeBuffer) Restore(buf []rune, idx int) {
+	r.buf = buf
+	r.idx = idx
 }
 
 func (r *runeBuffer) Reset() []rune {

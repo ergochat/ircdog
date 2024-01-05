@@ -4,7 +4,6 @@ package platform
 
 import (
 	"context"
-	"io"
 	"os"
 	"os/signal"
 	"sync"
@@ -16,13 +15,6 @@ import (
 const (
 	IsWindows = false
 )
-
-type winsize struct {
-	Row    uint16
-	Col    uint16
-	Xpixel uint16
-	Ypixel uint16
-}
 
 // SuspendProcess suspends the process with SIGTSTP,
 // then blocks until it is resumed.
@@ -37,23 +29,6 @@ func SuspendProcess() {
 	p.Signal(syscall.SIGTSTP)
 	// wait for SIGCONT
 	<-ctx.Done()
-}
-
-// get width of the terminal
-func getWidth(stdoutFd int) int {
-	cols, _, err := term.GetSize(stdoutFd)
-	if err != nil {
-		return -1
-	}
-	return cols
-}
-
-func GetScreenWidth() int {
-	w := getWidth(syscall.Stdout)
-	if w < 0 {
-		w = getWidth(syscall.Stderr)
-	}
-	return w
 }
 
 // getWidthHeight of the terminal using given file descriptor
@@ -74,17 +49,8 @@ func GetScreenSize() (width int, height int) {
 	return
 }
 
-// ClearScreen clears the console screen
-func ClearScreen(w io.Writer) (int, error) {
-	return w.Write([]byte("\033[H"))
-}
-
 func DefaultIsTerminal() bool {
 	return term.IsTerminal(syscall.Stdin) && (term.IsTerminal(syscall.Stdout) || term.IsTerminal(syscall.Stderr))
-}
-
-func GetStdin() int {
-	return syscall.Stdin
 }
 
 // -----------------------------------------------------------------------------

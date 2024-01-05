@@ -27,6 +27,7 @@ type operation struct {
 	search    *opSearch
 	completer *opCompleter
 	vim       *opVim
+	undo      *opUndo
 }
 
 func (o *operation) SetBuffer(what string) {
@@ -92,6 +93,8 @@ func (o *operation) GetConfig() *Config {
 }
 
 func (o *operation) readline(deadline chan struct{}) ([]rune, error) {
+	isTyping := false // don't add new undo entries during normal typing
+
 	for {
 		keepInSearchMode := false
 		keepInCompleteMode := false
@@ -163,6 +166,8 @@ func (o *operation) readline(deadline chan struct{}) ([]rune, error) {
 
 		var result []rune
 
+		isTypingRune := false
+
 		switch r {
 		case CharBell:
 			if o.search.IsSearchMode() {
@@ -180,6 +185,7 @@ func (o *operation) readline(deadline chan struct{}) ([]rune, error) {
 			}
 			keepInSearchMode = true
 		case CharCtrlU:
+			o.undo.add()
 			o.buf.KillFront()
 		case CharFwdSearch:
 			if !o.search.SearchMode(searchDirectionForward) {
@@ -188,21 +194,25 @@ func (o *operation) readline(deadline chan struct{}) ([]rune, error) {
 			}
 			keepInSearchMode = true
 		case CharKill:
+			o.undo.add()
 			o.buf.Kill()
 			keepInCompleteMode = true
 		case MetaForward:
 			o.buf.MoveToNextWord()
 		case CharTranspose:
+			o.undo.add()
 			o.buf.Transpose()
 		case MetaBackward:
 			o.buf.MoveToPrevWord()
 		case MetaDelete:
+			o.undo.add()
 			o.buf.DeleteWord()
 		case CharLineStart:
 			o.buf.MoveToLineStart()
 		case CharLineEnd:
 			o.buf.MoveToLineEnd()
 		case CharBackspace, CharCtrlH:
+			o.undo.add()
 			if o.search.IsSearchMode() {
 				o.search.SearchBackspace()
 				keepInSearchMode = true
@@ -221,15 +231,18 @@ func (o *operation) readline(deadline chan struct{}) ([]rune, error) {
 				o.Refresh()
 			}
 		case CharCtrlL:
-			platform.ClearScreen(o.t)
+			clearScreen(o.t)
 			o.buf.SetOffset(cursorPosition{1, 1})
 			o.Refresh()
 		case MetaBackspace, CharCtrlW:
+			o.undo.add()
 			o.buf.BackEscapeWord()
 		case MetaShiftTab:
 			// no-op
 		case CharCtrlY:
 			o.buf.Yank()
+		case CharCtrl_:
+			o.undo.undo()
 		case CharEnter, CharCtrlJ:
 			if o.search.IsSearchMode() {
 				o.search.ExitSearchMode(false)
@@ -240,14 +253,9 @@ func (o *operation) readline(deadline chan struct{}) ([]rune, error) {
 			}
 			o.buf.MoveToLineEnd()
 			var data []rune
-			if !o.GetConfig().UniqueEditLine {
-				o.buf.WriteRune('\n')
-				data = o.buf.Reset()
-				data = data[:len(data)-1] // trim \n
-			} else {
-				o.buf.Clean()
-				data = o.buf.Reset()
-			}
+			o.buf.WriteRune('\n')
+			data = o.buf.Reset()
+			data = data[:len(data)-1] // trim \n
 			result = data
 			if !o.GetConfig().DisableAutoSaveHistory {
 				// ignore IO error
@@ -255,6 +263,7 @@ func (o *operation) readline(deadline chan struct{}) ([]rune, error) {
 			} else {
 				isUpdateHistory = false
 			}
+			o.undo.init()
 		case CharBackward:
 			o.buf.MoveBackward()
 		case CharForward:
@@ -263,6 +272,7 @@ func (o *operation) readline(deadline chan struct{}) ([]rune, error) {
 			buf := o.history.Prev()
 			if buf != nil {
 				o.buf.Set(buf)
+				o.undo.init()
 			} else {
 				o.t.Bell()
 			}
@@ -270,10 +280,12 @@ func (o *operation) readline(deadline chan struct{}) ([]rune, error) {
 			buf, ok := o.history.Next()
 			if ok {
 				o.buf.Set(buf)
+				o.undo.init()
 			} else {
 				o.t.Bell()
 			}
 		case MetaDeleteKey, CharEOT:
+			o.undo.add()
 			// on Delete key or Ctrl-D, attempt to delete a character:
 			if o.buf.Len() > 0 || !o.IsNormalMode() {
 				if !o.buf.Delete() {
@@ -285,15 +297,11 @@ func (o *operation) readline(deadline chan struct{}) ([]rune, error) {
 				break
 			}
 			// Ctrl-D on an empty buffer: treated as EOF
-			if !o.GetConfig().UniqueEditLine {
-				o.buf.WriteString(o.GetConfig().EOFPrompt + "\n")
-			}
+			o.buf.WriteString(o.GetConfig().EOFPrompt + "\n")
 			o.buf.Reset()
 			isUpdateHistory = false
 			o.history.Revert()
-			if o.GetConfig().UniqueEditLine {
-				o.buf.Clean()
-			}
+			o.buf.Clean()
 			return nil, io.EOF
 		case CharInterrupt:
 			if o.search.IsSearchMode() {
@@ -308,13 +316,9 @@ func (o *operation) readline(deadline chan struct{}) ([]rune, error) {
 			o.buf.MoveToLineEnd()
 			o.buf.Refresh(nil)
 			hint := o.GetConfig().InterruptPrompt + "\n"
-			if !o.GetConfig().UniqueEditLine {
-				o.buf.WriteString(hint)
-			}
+			o.buf.WriteString(hint)
 			remain := o.buf.Reset()
-			if !o.GetConfig().UniqueEditLine {
-				remain = remain[:len(remain)-len([]rune(hint))]
-			}
+			remain = remain[:len(remain)-len([]rune(hint))]
 			isUpdateHistory = false
 			o.history.Revert()
 			return nil, ErrInterrupt
@@ -333,6 +337,10 @@ func (o *operation) readline(deadline chan struct{}) ([]rune, error) {
 			} // else: process as a normal input character
 			fallthrough
 		default:
+			isTypingRune = true
+			if !isTyping {
+				o.undo.add()
+			}
 			if o.search.IsSearchMode() {
 				o.search.SearchChar(r)
 				keepInSearchMode = true
@@ -349,6 +357,8 @@ func (o *operation) readline(deadline chan struct{}) ([]rune, error) {
 			}
 		}
 
+		isTyping = isTypingRune
+
 		// suppress the Listener callback if we received Enter or similar and are
 		// submitting the result, since the buffer has already been cleared:
 		if result == nil {
@@ -364,10 +374,12 @@ func (o *operation) readline(deadline chan struct{}) ([]rune, error) {
 		if !keepInSearchMode && o.search.IsSearchMode() {
 			o.search.ExitSearchMode(false)
 			o.buf.Refresh(nil)
+			o.undo.init()
 		} else if o.completer.IsInCompleteMode() {
 			if !keepInCompleteMode {
 				o.completer.ExitCompleteMode(false)
 				o.refresh()
+				o.undo.init()
 			} else {
 				o.buf.Refresh(nil)
 				o.completer.CompleteRefresh()
@@ -402,7 +414,8 @@ func (o *operation) Runes() ([]rune, error) {
 	o.t.EnterRawMode()
 	defer o.t.ExitRawMode()
 
-	listener := o.GetConfig().Listener
+	cfg := o.GetConfig()
+	listener := cfg.Listener
 	if listener != nil {
 		listener(nil, 0, 0)
 	}
@@ -419,6 +432,10 @@ func (o *operation) Runes() ([]rune, error) {
 	// Prompt written safely, unlock until read completes and then
 	// lock again to unset.
 	o.m.Unlock()
+
+	if cfg.Undo {
+		o.undo = newOpUndo(o)
+	}
 
 	defer func() {
 		o.m.Lock()
@@ -440,9 +457,7 @@ func (o *operation) getAndSetOffset(deadline chan struct{}) {
 	// the screen but the next character would actually be printed
 	// at the beginning of the next line.
 	// TODO ???
-	if !platform.IsWindows {
-		o.t.Write([]byte(" \b"))
-	}
+	o.t.Write([]byte(" \b"))
 
 	if offset, err := o.t.GetCursorPosition(deadline); err == nil {
 		o.buf.SetOffset(offset)
@@ -546,8 +561,4 @@ func (o *operation) refresh() {
 	if o.isPrompting {
 		o.buf.Refresh(nil)
 	}
-}
-
-func (o *operation) Clean() {
-	o.buf.Clean()
 }

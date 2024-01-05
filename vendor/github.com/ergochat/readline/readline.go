@@ -44,7 +44,6 @@ type Config struct {
 	InterruptPrompt string
 	EOFPrompt       string
 
-	FuncGetWidth func() int
 	// Function that returns width, height of the terminal or -1,-1 if unknown
 	FuncGetSize func() (width int, height int)
 
@@ -55,9 +54,8 @@ type Config struct {
 	EnableMask bool
 	MaskRune   rune
 
-	// erase the editing line after user submited it
-	// it use in IM usually.
-	UniqueEditLine bool
+	// Whether to maintain an undo buffer (Ctrl+_ to undo if enabled)
+	Undo bool
 
 	// filter input runes (may be used to disable CtrlZ or for translating some keys to different actions)
 	// -> output = new (translated) rune and true/false if continue with processing this one
@@ -105,9 +103,6 @@ func (c *Config) init() error {
 		c.EOFPrompt = ""
 	}
 
-	if c.FuncGetWidth == nil {
-		c.FuncGetWidth = platform.GetScreenWidth
-	}
 	if c.FuncGetSize == nil {
 		c.FuncGetSize = platform.GetScreenSize
 	}
@@ -267,10 +262,8 @@ func (i *Instance) CaptureExitSignal() {
 	}()
 }
 
-func (i *Instance) Clean() {
-	i.operation.Clean()
-}
-
+// Write writes output to the screen, redrawing the prompt and buffer
+// as needed.
 func (i *Instance) Write(b []byte) (int, error) {
 	return i.Stdout().Write(b)
 }
@@ -302,6 +295,11 @@ func (i *Instance) DisableHistory() {
 // EnableHistory enables the saving of input lines in history.
 func (i *Instance) EnableHistory() {
 	i.operation.history.Enable()
+}
+
+// ClearScreen clears the screen.
+func (i *Instance) ClearScreen() {
+	clearScreen(i.operation.Stdout())
 }
 
 // Painter is a callback type to allow modifying the buffer before it is rendered

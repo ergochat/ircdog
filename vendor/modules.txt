@@ -6,11 +6,12 @@ github.com/docopt/docopt-go
 github.com/ergochat/irc-go/ircfmt
 github.com/ergochat/irc-go/ircmsg
 github.com/ergochat/irc-go/ircreader
-# github.com/ergochat/readline v0.0.5
-## explicit; go 1.18
+# github.com/ergochat/readline v0.1.0-rc1
+## explicit; go 1.19
 github.com/ergochat/readline
 github.com/ergochat/readline/internal/ansi
 github.com/ergochat/readline/internal/platform
+github.com/ergochat/readline/internal/ringbuf
 github.com/ergochat/readline/internal/runes
 github.com/ergochat/readline/internal/term
 # github.com/gorilla/websocket v1.5.0
@@ -20,9 +21,8 @@ github.com/gorilla/websocket
 ## explicit; go 1.15
 github.com/jwalton/go-supportscolor
 github.com/jwalton/go-supportscolor/pkg/hasFlag
-# golang.org/x/sys v0.6.0
-## explicit; go 1.17
-golang.org/x/sys/internal/unsafeheader
+# golang.org/x/sys v0.15.0
+## explicit; go 1.18
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
