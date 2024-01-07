@@ -3,10 +3,11 @@ package readline
 import (
 	"container/list"
 	"fmt"
+	"io"
 	"os"
 	"sync"
+	"syscall"
 
-	"github.com/ergochat/readline/internal/platform"
 	"github.com/ergochat/readline/internal/term"
 )
 
@@ -34,6 +35,7 @@ const (
 	CharCtrlY     = 25
 	CharCtrlZ     = 26
 	CharEsc       = 27
+	CharCtrl_     = 31
 	CharO         = 79
 	CharEscapeEx  = 91
 	CharBackspace = 127
@@ -57,7 +59,7 @@ type rawModeHandler struct {
 func (r *rawModeHandler) Enter() (err error) {
 	r.Lock()
 	defer r.Unlock()
-	r.state, err = term.MakeRaw(platform.GetStdin())
+	r.state, err = term.MakeRaw(int(syscall.Stdin))
 	return err
 }
 
@@ -67,10 +69,15 @@ func (r *rawModeHandler) Exit() error {
 	if r.state == nil {
 		return nil
 	}
-	err := term.Restore(platform.GetStdin(), r.state)
+	err := term.Restore(int(syscall.Stdin), r.state)
 	if err == nil {
 		r.state = nil
 	}
+	return err
+}
+
+func clearScreen(w io.Writer) error {
+	_, err := w.Write([]byte("\x1b[H\x1b[J"))
 	return err
 }
 
@@ -80,14 +87,15 @@ func (r *rawModeHandler) Exit() error {
 func debugList(l *list.List) {
 	idx := 0
 	for e := l.Front(); e != nil; e = e.Next() {
-		debugPrint(idx, fmt.Sprintf("%+v", e.Value))
+		debugPrint("%d %+v", idx, e.Value)
 		idx++
 	}
 }
 
 // append log info to another file
-func debugPrint(o ...interface{}) {
-	f, _ := os.OpenFile("debug.tmp", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	fmt.Fprintln(f, o...)
+func debugPrint(fmtStr string, o ...interface{}) {
+	f, _ := os.OpenFile("debug.tmp", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+	fmt.Fprintf(f, fmtStr, o...)
+	fmt.Fprintln(f)
 	f.Close()
 }
