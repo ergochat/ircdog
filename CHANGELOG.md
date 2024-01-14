@@ -3,6 +3,12 @@ All notable changes to ircdog will be documented in this file.
 
 This project adheres to [Semantic Versioning](http://semver.org/). For the purposes of versioning, we consider the "public API" to refer to the configuration files and CLI.
 
+## [0.5.2] - 2024-01-14
+ircdog v0.5.2 upgrades the readline library, fixing some edge cases in line editing.
+
+* Upgrade ergochat/readline to v0.1.0-rc1 (#47)
+* Release builds use Go 1.21.6
+
 ## [0.5.1] - 2023-06-11
 ircdog v0.5.1 fixes a bug in the new (v0.5.0) `--reconnect` feature. We apologize for the oversight.
 
