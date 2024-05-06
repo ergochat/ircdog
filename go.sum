@@ -2,12 +2,8 @@ github.com/docopt/docopt-go v0.0.0-20160216232012-784ddc588536 h1:rHnpq7uNlix5l7
 github.com/docopt/docopt-go v0.0.0-20160216232012-784ddc588536/go.mod h1:WwZ+bS3ebgob9U8Nd0kOddGdZWjyMGR8Wziv+TBNwSE=
 github.com/ergochat/irc-go v0.3.0 h1:qgvb2knh8d6yIVsHX+PRQ2CiRj1NGG5x88ABmR1lWng=
 github.com/ergochat/irc-go v0.3.0/go.mod h1:2vi7KNpIPWnReB5hmLpl92eMywQvuIeIIGdt/FQCph0=
-github.com/ergochat/readline v0.1.0-rc1 h1:zY4gDCDMV0LpJW9hU+0aA+vlzVb6MJKPEQLM4b8p/h4=
-github.com/ergochat/readline v0.1.0-rc1/go.mod h1:o3ux9QLHLm77bq7hDB21UTm6HlV2++IPDMfIfKDuOgY=
-github.com/ergochat/readline v0.1.1-rc1 h1:VWYKbzKbRX54feYhcoZIoydRdSwOOUR/UbOGu6wZmMc=
-github.com/ergochat/readline v0.1.1-rc1/go.mod h1:o3ux9QLHLm77bq7hDB21UTm6HlV2++IPDMfIfKDuOgY=
-github.com/ergochat/readline v0.1.1-rc2 h1:pkvxu+mZ08gN+yWUxRQQzYSO4v5jShzakZ6mKt7R7TA=
-github.com/ergochat/readline v0.1.1-rc2/go.mod h1:o3ux9QLHLm77bq7hDB21UTm6HlV2++IPDMfIfKDuOgY=
+github.com/ergochat/readline v0.1.1 h1:C8Uuo3ybB23GWOt0uxmHbGzKM9owmtXary6Clrj84s0=
+github.com/ergochat/readline v0.1.1/go.mod h1:o3ux9QLHLm77bq7hDB21UTm6HlV2++IPDMfIfKDuOgY=
 github.com/gorilla/websocket v1.5.0 h1:PPwGk2jz7EePpoHN/+ClbZu8SPxiqlu12wZP/3sWmnc=
 github.com/gorilla/websocket v1.5.0/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 github.com/jwalton/go-supportscolor v1.1.0 h1:HsXFJdMPjRUAx8cIW6g30hVSFYaxh9yRQwEWgkAR7lQ=
