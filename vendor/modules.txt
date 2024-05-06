@@ -6,7 +6,7 @@ github.com/docopt/docopt-go
 github.com/ergochat/irc-go/ircfmt
 github.com/ergochat/irc-go/ircmsg
 github.com/ergochat/irc-go/ircreader
-# github.com/ergochat/readline v0.1.0-rc1
+# github.com/ergochat/readline v0.1.1
 ## explicit; go 1.19
 github.com/ergochat/readline
 github.com/ergochat/readline/internal/ansi
