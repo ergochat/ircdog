@@ -73,7 +73,9 @@ func ReadScript(filename string) (commands []string, err error) {
 	reader := bufio.NewReader(infile)
 	for {
 		line, err := reader.ReadString('\n')
-		if command := strings.TrimRight(line, "\r\n"); command != "" {
+		command := strings.TrimRight(line, "\r\n")
+		command = strings.TrimLeft(command, " \t\v\r")
+		if command != "" && !strings.HasPrefix(command, "#") {
 			commands = append(commands, command)
 		}
 		if err == io.EOF {
