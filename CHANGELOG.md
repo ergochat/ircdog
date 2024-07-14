@@ -3,6 +3,13 @@ All notable changes to ircdog will be documented in this file.
 
 This project adheres to [Semantic Versioning](http://semver.org/). For the purposes of versioning, we consider the "public API" to refer to the configuration files and CLI.
 
+## [0.5.4] - 2024-07-14
+ircdog v0.5.4 has minor enhancements:
+
+* Upgrade ergochat/readline to v0.1.2 (#50)
+* `--script` now supports ignoring commented lines beginning with `#` (#46, #51)
+* Release builds use Go 1.22.5
+
 ## [0.5.3] - 2024-05-06
 ircdog v0.5.3 upgrades the readline library, adding support for the Home and End keys.
 
