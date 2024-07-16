@@ -84,3 +84,6 @@ $RECYCLE.BIN/
 *.swp
 
 # End of https://www.gitignore.io/api/windows,osx,linux,go
+
+# Custom
+dist/
