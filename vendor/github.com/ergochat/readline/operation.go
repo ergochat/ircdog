@@ -124,14 +124,6 @@ func (o *operation) readline(deadline chan struct{}) ([]rune, error) {
 		}
 		isUpdateHistory := true
 
-		if o.completer.IsInPagerMode() {
-			keepInCompleteMode = o.completer.HandlePagerMode(r)
-			if !keepInCompleteMode {
-				o.buf.Refresh(nil)
-			}
-			continue
-		}
-
 		if o.completer.IsInCompleteSelectMode() {
 			keepInCompleteMode = o.completer.HandleCompleteSelect(r)
 			if keepInCompleteMode {
@@ -476,11 +468,10 @@ func (o *operation) GenPasswordConfig() *Config {
 		Stdout: baseConfig.Stdout,
 		Stderr: baseConfig.Stderr,
 
-		FuncIsTerminal:      baseConfig.FuncIsTerminal,
-		FuncMakeRaw:         baseConfig.FuncMakeRaw,
-		FuncExitRaw:         baseConfig.FuncExitRaw,
-		FuncOnWidthChanged:  baseConfig.FuncOnWidthChanged,
-		ForceUseInteractive: baseConfig.ForceUseInteractive,
+		FuncIsTerminal:     baseConfig.FuncIsTerminal,
+		FuncMakeRaw:        baseConfig.FuncMakeRaw,
+		FuncExitRaw:        baseConfig.FuncExitRaw,
+		FuncOnWidthChanged: baseConfig.FuncOnWidthChanged,
 	}
 }
 
