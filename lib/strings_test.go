@@ -44,6 +44,10 @@ var replacementTestCases = []stringTestCase{
 	{`www[[\x0D]]`, "www\x0d"},
 	{`www[[\xff]]`, "www\xff"},
 	{`www[[\xFF]]`, "www\xff"},
+	{`www[[\xFF\x00]]`, "www\xff\x00"},
+	{`www[[\xFF\x00\x01]]01`, "www\xff\x00\x0101"},
+	{`www[[\xaa\xBB\xcc\x35]]01`, "www\xaa\xbb\xcc\x3501"},
+	{`www[[\xzz]]`, "www[[\\xzz]]"}, // invalid hex is not an escape
 	{`[[notanescape]]`, "[[notanescape]]"},
 	{`[[[U]]]`, "[\x1f]"},
 }

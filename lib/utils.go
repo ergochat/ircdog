@@ -14,7 +14,8 @@ import (
 
 var (
 	// e.g., [[\x00]] for \x00, [[\xFF]] or [[\xff]] for \xff
-	hexEscapeRegex = regexp.MustCompile(`^\[\[\\x[0-9a-fA-F]{2}\]\]`)
+	// multiple escapes are accepted within the same block, e.g. [[\x00\x01\x03]]
+	hexEscapeRegex = regexp.MustCompile(`^\[\[(\\x[0-9a-fA-F]{2})+\]\]`)
 )
 
 var controlCodeReplacements = []struct {
@@ -49,12 +50,15 @@ LineLoop:
 					continue LineLoop
 				}
 			}
-			if hexEscapeRegex.MatchString(line) {
-				if val, err := strconv.ParseUint(strings.ToLower(line[4:6]), 16, 8); err == nil {
-					buf.WriteByte(byte(val))
-					line = line[8:]
-					continue LineLoop
+			if matched := hexEscapeRegex.FindString(line); matched != "" {
+				// [[\x01\x02]]
+				for i := 2; i < len(matched)-2; i += 4 {
+					if val, err := strconv.ParseUint(line[i+2:i+4], 16, 8); err == nil {
+						buf.WriteByte(byte(val))
+					}
 				}
+				line = line[len(matched):]
+				continue LineLoop
 			}
 		}
 		buf.WriteByte(line[0])
