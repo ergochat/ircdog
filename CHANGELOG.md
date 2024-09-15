@@ -1,7 +1,12 @@
 # Changelog
 All notable changes to ircdog will be documented in this file.
 
-This project adheres to [Semantic Versioning](http://semver.org/). For the purposes of versioning, we consider the "public API" to refer to the configuration files and CLI.
+## [0.5.5] - 2024-09-15
+ircdog v0.5.5 has minor enhancements:
+
+* Upgrade ergochat/readline to v0.1.3 (#52)
+* Allow multiple hex escapes within the same escape block, e.g. `[[\x00\x01]]` (#53)
+* Release builds use Go 1.23.1
 
 ## [0.5.4] - 2024-07-14
 ircdog v0.5.4 has minor enhancements:
