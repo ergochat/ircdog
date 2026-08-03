@@ -145,29 +145,31 @@ func ReadScript(filename string) (commands []ScriptCommand, err error) {
 var invalidCommand = errors.New("invalid command")
 
 func parseStarCommand(origCommand string) (sc []ScriptCommand, err error) {
-	// right now we only accept *sleep
-
-	command := strings.ToLower(origCommand)
-	if durStr, ok := strings.CutPrefix(command, "*sleep"); ok {
-		durStr = strings.TrimSpace(durStr)
-		if dur, err := time.ParseDuration(durStr); err == nil {
-			return []ScriptCommand{{Type: ScriptSleep, Sleep: dur}}, nil
-		}
-		if floatDur, err := strconv.ParseFloat(durStr, 64); err == nil {
-			dur := time.Duration(floatDur * float64(time.Second))
-			return []ScriptCommand{{Type: ScriptSleep, Sleep: dur}}, nil
-		}
-	} else if strings.HasPrefix(command, "*saslplain") {
-		fields := strings.Fields(origCommand)
-		if len(fields) == 3 {
-			var result []ScriptCommand
-			for _, str := range EncodeSASLPlain(fields[1], fields[2]) {
-				result = append(
-					result,
-					ScriptCommand{Type: ScriptMessage, Message: str},
-				)
+	fields := strings.Fields(origCommand)
+	if len(fields) > 0 {
+		switch strings.ToLower(fields[0]) {
+		case "*sleep":
+			if len(fields) == 2 {
+				durStr := fields[1]
+				if dur, err := time.ParseDuration(durStr); err == nil {
+					return []ScriptCommand{{Type: ScriptSleep, Sleep: dur}}, nil
+				}
+				if floatDur, err := strconv.ParseFloat(durStr, 64); err == nil {
+					dur := time.Duration(floatDur * float64(time.Second))
+					return []ScriptCommand{{Type: ScriptSleep, Sleep: dur}}, nil
+				}
 			}
-			return result, nil
+		case "*saslplain":
+			if len(fields) == 3 {
+				var result []ScriptCommand
+				for _, str := range EncodeSASLPlain(fields[1], fields[2]) {
+					result = append(
+						result,
+						ScriptCommand{Type: ScriptMessage, Message: str},
+					)
+				}
+				return result, nil
+			}
 		}
 	}
 	return sc, invalidCommand
