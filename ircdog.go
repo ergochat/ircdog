@@ -476,11 +476,17 @@ func connectExternal(
 			}
 
 			if !raw && strings.HasPrefix(line, "*") {
-				if strings.HasPrefix(strings.ToLower(line), "*saslplain") {
-					if fields := strings.Fields(line); len(fields) == 3 {
-						for _, resp := range lib.EncodeSASLPlain(fields[1], fields[2]) {
-							if !sendLine(resp) {
-								return
+				// only implement *SASLPLAIN here, not *SLEEP because it doesn't make sense interactively;
+				// we'll decide in future what to do about other commands
+				fields := strings.Fields(line)
+				if len(fields) > 0 {
+					switch strings.ToLower(fields[0]) {
+					case "*saslplain":
+						if len(fields) == 3 {
+							for _, resp := range lib.EncodeSASLPlain(fields[1], fields[2]) {
+								if !sendLine(resp) {
+									return
+								}
 							}
 						}
 					}
