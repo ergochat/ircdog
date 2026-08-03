@@ -196,6 +196,15 @@ func trimInitialSpaces(str string) string {
 	return str[i:]
 }
 
+func isASCII(str string) bool {
+	for i := 0; i < len(str); i++ {
+		if str[i] > 127 {
+			return false
+		}
+	}
+	return true
+}
+
 func parseLine(line string, maxTagDataLength int, truncateLen int) (ircmsg Message, err error) {
 	// remove either \n or \r\n from the end of the line:
 	line = strings.TrimSuffix(line, "\n")
@@ -238,7 +247,7 @@ func parseLine(line string, maxTagDataLength int, truncateLen int) (ircmsg Messa
 	// truncate if desired
 	if truncateLen != 0 && truncateLen < len(line) {
 		err = ErrorBodyTooLong
-		line = line[:truncateLen]
+		line = TruncateUTF8Safe(line, truncateLen)
 	}
 
 	// modern: "These message parts, and parameters themselves, are separated
@@ -265,11 +274,16 @@ func parseLine(line string, maxTagDataLength int, truncateLen int) (ircmsg Messa
 		commandEnd = len(line)
 		paramStart = len(line)
 	}
-	// normalize command to uppercase:
-	ircmsg.Command = strings.ToUpper(line[:commandEnd])
-	if len(ircmsg.Command) == 0 {
+	baseCommand := line[:commandEnd]
+	if len(baseCommand) == 0 {
 		return ircmsg, ErrorLineIsEmpty
 	}
+	// technically this must be either letters or a 3-digit numeric:
+	if !isASCII(baseCommand) {
+		return ircmsg, ErrorLineContainsBadChar
+	}
+	// normalize command to uppercase:
+	ircmsg.Command = strings.ToUpper(baseCommand)
 	line = line[paramStart:]
 
 	for {
