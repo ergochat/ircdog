@@ -449,7 +449,7 @@ func connectExternal(
 				case lib.ScriptMessage:
 					// don't bother handling --ignore for scripted commands
 					if !sendLine(command.Message) {
-						return 1
+						return
 					}
 					fmt.Fprintln(console, command.Message)
 				}
