@@ -66,6 +66,12 @@ Sending Escapes:
 	 C hex escape  | [[\x??]] | 0x??
 	---------------------------------
 
+Metacommands:
+	ircdog accepts the following metacommands (--raw disables):
+
+	*SASLPLAIN <username> <password> (sends SASL PLAIN authentication)
+	*SLEEP <duration> (only in scripts, inserts a delay)
+
 Options:
 	--tls                 Connect using TLS.
 	--tls-noverify        Don't verify the provided TLS certificates.
@@ -325,7 +331,7 @@ func runClient(
 	defer console.Close()
 	lineChan := make(chan string)
 	openChan := make(chan struct{})
-	go func() {
+	go func(openChan chan struct{}) {
 		<-openChan // wait to show the prompt until connection established
 		for {
 			line, err := console.Readline()
@@ -339,7 +345,7 @@ func runClient(
 				return
 			}
 		}
-	}()
+	}(openChan)
 
 	for {
 		status := connectExternal(
@@ -424,16 +430,29 @@ func connectExternal(
 		}
 	}()
 
+	sendLine := func(line string) (ok bool) {
+		err := connection.SendLine(line)
+		if err != nil {
+			log.Println("** ircdog error: failed to send line:", err.Error())
+			return false
+		}
+		transcript.WriteLine(line, true)
+		return true
+	}
+
 	if script != "" {
 		if scriptCommands, err := lib.ReadScript(script); err == nil {
 			for _, command := range scriptCommands {
-				if err := connection.SendLine(command); err != nil {
-					log.Println("** ircdog error: failed to send line:", err.Error())
-					return 1
+				switch command.Type {
+				case lib.ScriptSleep:
+					time.Sleep(command.Sleep)
+				case lib.ScriptMessage:
+					// don't bother handling --ignore for scripted commands
+					if !sendLine(command.Message) {
+						return
+					}
+					fmt.Fprintln(console, command.Message)
 				}
-				transcript.WriteLine(command, true)
-				// don't bother handling --ignore for scripted commands
-				fmt.Fprintln(console, command)
 			}
 		} else {
 			log.Printf("** ircdog was unable to read script, ignoring: %v", err)
@@ -456,16 +475,32 @@ func connectExternal(
 				status = 0
 			}
 
+			if !raw && strings.HasPrefix(line, "*") {
+				// only implement *SASLPLAIN here, not *SLEEP because it doesn't make sense interactively;
+				// we'll decide in future what to do about other commands
+				fields := strings.Fields(line)
+				if len(fields) > 0 {
+					switch strings.ToLower(fields[0]) {
+					case "*saslplain":
+						if len(fields) == 3 {
+							for _, resp := range lib.EncodeSASLPlain(fields[1], fields[2]) {
+								if !sendLine(resp) {
+									return
+								}
+							}
+						}
+					}
+				}
+				continue
+			}
+
 			if !raw {
 				line = lib.ReplaceControlCodes(line)
 			}
 
-			err = connection.SendLine(line)
-			if err != nil {
-				log.Println("** ircdog error: failed to send line:", err.Error())
+			if !sendLine(line) {
 				return
 			}
-			transcript.WriteLine(line, true)
 
 		case <-doneChan:
 			return

@@ -1,11 +1,12 @@
 # github.com/docopt/docopt-go v0.0.0-20160216232012-784ddc588536
 ## explicit
 github.com/docopt/docopt-go
-# github.com/ergochat/irc-go v0.3.0
+# github.com/ergochat/irc-go v0.6.0
 ## explicit; go 1.15
 github.com/ergochat/irc-go/ircfmt
 github.com/ergochat/irc-go/ircmsg
 github.com/ergochat/irc-go/ircreader
+github.com/ergochat/irc-go/ircutils
 # github.com/ergochat/readline v0.1.3
 ## explicit; go 1.19
 github.com/ergochat/readline

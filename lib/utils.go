@@ -5,11 +5,15 @@ package lib
 
 import (
 	"bufio"
+	"errors"
 	"io"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/ergochat/irc-go/ircutils"
 )
 
 var (
@@ -30,6 +34,29 @@ var controlCodeReplacements = []struct {
 	{"[[S]]", '\x1e'},
 	{"[[U]]", '\x1f'},
 	{"[[R]]", '\x0f'},
+}
+
+func EncodeSASLPlain(username, password string) []string {
+	buf := make([]byte, 2*len(username)+len(password)+2)
+	pos := buf
+	// authzid, optional in most implementations but we'll include it
+	copy(pos, username[:])
+	pos = pos[len(username):]
+	pos[0] = '\x00'
+	pos = pos[1:]
+	// authcid, required
+	copy(pos, username[:])
+	pos = pos[len(username):]
+	pos[0] = '\x00'
+	pos = pos[1:]
+	copy(pos, password[:])
+
+	encoded := ircutils.EncodeSASLResponse(buf)
+	result := make([]string, len(encoded))
+	for i, enc := range encoded {
+		result[i] = "AUTHENTICATE " + enc
+	}
+	return result
 }
 
 // ReplaceControlCodes applies our control code replacements to the line.
@@ -68,7 +95,20 @@ LineLoop:
 	return buf.String()
 }
 
-func ReadScript(filename string) (commands []string, err error) {
+type ScriptCommandType uint
+
+const (
+	ScriptMessage ScriptCommandType = iota
+	ScriptSleep
+)
+
+type ScriptCommand struct {
+	Type    ScriptCommandType
+	Message string
+	Sleep   time.Duration
+}
+
+func ReadScript(filename string) (commands []ScriptCommand, err error) {
 	infile, err := os.Open(filename)
 	if err != nil {
 		return
@@ -79,13 +119,58 @@ func ReadScript(filename string) (commands []string, err error) {
 		line, err := reader.ReadString('\n')
 		command := strings.TrimRight(line, "\r\n")
 		command = strings.TrimLeft(command, " \t\v\r")
-		if command != "" && !strings.HasPrefix(command, "#") {
-			commands = append(commands, command)
+
+		switch {
+		case command == "":
+			// ignore
+		case strings.HasPrefix(command, "#"):
+			// comment, ignore
+		case strings.HasPrefix(command, "*"):
+			if sc, pErr := parseStarCommand(command); pErr == nil {
+				commands = append(commands, sc...)
+			}
+		default:
+			sc := ScriptCommand{Type: ScriptMessage, Message: command}
+			commands = append(commands, sc)
 		}
+
 		if err == io.EOF {
 			return commands, nil
 		} else if err != nil {
 			return commands, err
 		}
 	}
+}
+
+var invalidCommand = errors.New("invalid command")
+
+func parseStarCommand(origCommand string) (sc []ScriptCommand, err error) {
+	fields := strings.Fields(origCommand)
+	if len(fields) > 0 {
+		switch strings.ToLower(fields[0]) {
+		case "*sleep":
+			if len(fields) == 2 {
+				durStr := fields[1]
+				if dur, err := time.ParseDuration(durStr); err == nil {
+					return []ScriptCommand{{Type: ScriptSleep, Sleep: dur}}, nil
+				}
+				if floatDur, err := strconv.ParseFloat(durStr, 64); err == nil {
+					dur := time.Duration(floatDur * float64(time.Second))
+					return []ScriptCommand{{Type: ScriptSleep, Sleep: dur}}, nil
+				}
+			}
+		case "*saslplain":
+			if len(fields) == 3 {
+				var result []ScriptCommand
+				for _, str := range EncodeSASLPlain(fields[1], fields[2]) {
+					result = append(
+						result,
+						ScriptCommand{Type: ScriptMessage, Message: str},
+					)
+				}
+				return result, nil
+			}
+		}
+	}
+	return sc, invalidCommand
 }
